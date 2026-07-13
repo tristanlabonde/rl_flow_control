@@ -1,0 +1,16 @@
+Dans CaNS, le fichier stats1d.out enregistre les profils statistiques moyennés sur le plan horizontal x-y pour chaque hauteur z.
+
+    colonne 1 : position en z (hauteur)
+vitesses moyennes :
+    colonne 2 : u moyenne
+    colonne 3 : v moyenne
+    colonne 4 : w moyenne
+variances des fluctuations :
+    colonne 5 : u_prime_2 moyenne
+    colonne 6 : v_prime_2 moyenne
+    colonne 7 : w_prime_2 moyenne
+autres :
+    colonne 8 :
+    colonne 9 :
+    colonne 10 :
+    colonne 11 :

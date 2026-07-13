@@ -1,0 +1,10 @@
+  791  scp ../../input_v0.04.nml collemichet@wells.mind.meiji.ac.jp:~/CaNS/run/imput.nml
+  792  scp ../../input_v0.04.nml collemichet@wells.mind.meiji.ac.jp:~/CaNS/run/input.nml
+  793  scp collemichet@wells.mind.meiji.ac.jp:data.tar ../
+  794  cd ..
+  795  mkdir res_v0.04
+  796  mv data.tar res_v0.04
+  797  ls
+  798  cd res_v0.04
+  799  tar xzvf data.tar
+  800  rm data.tar
