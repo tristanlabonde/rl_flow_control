@@ -1,7 +1,10 @@
 *~
 go_engine_example
-res_v0*
 __pycache__
 *.bin
 *.out
 *.xmf
+# Too heavy
+res_v0.1 
+res_v0.3
+res_v0.4
