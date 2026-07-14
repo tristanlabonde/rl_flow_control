@@ -5,6 +5,7 @@ import time
 from rl_fc_model import RL_FlowControl_Agent, nb_snapshots, nb_components, ng
 
 def parse_results(verbose=True): #results are stored in data/
+    # Read the results of the simulation from the output file stats1d.out and return a 4 x height array where row 0 is the height, row 1 is the u-velocity variance, row 2 is the v-velocity variance and row 3 is the w-velocity variance.
     if verbose:
         print("\tParsing results...")
 
@@ -15,7 +16,7 @@ def parse_results(verbose=True): #results are stored in data/
     return res
 
 def compute_tke(variances, verbose=True):
-    # Compute the loss computing the turbulent kinetic energy (TKE) from the output of the simulation.
+    # Compute the loss/tke (Turbulent Kinetic Energy) from the output of the simulation.
     if verbose:
         print("\tComputing reward...")
     if variances is None:
@@ -35,6 +36,7 @@ def compute_tke(variances, verbose=True):
     return tke
 
 def parse_input(filename, verbose=True):
+    # Placeholder for actual parsing logic
     if verbose:
         print(f"Parsing input file {filename}...")
     with open(filename, 'r') as f:
@@ -46,7 +48,7 @@ def parse_input(filename, verbose=True):
                 for j in range(ng[1]):
                     for k in range(ng[2]):
                         velocity_field[t][c][i][j][k] = (t+1)*10000+(c+1)*1000+i*100+j*10+k
-    return velocity_field  # Placeholder for actual parsing logic
+    return velocity_field
 
 def create_input(filename, train_velocity_field, verbose=True):
     # Placeholder for input creation logic based on loss
@@ -54,7 +56,8 @@ def create_input(filename, train_velocity_field, verbose=True):
         print(f"\tCreating input file {filename}")
 
 def launch_simulation(filename, verbose=True):
-    command = ["sbatch", "--wait", "srun.sh", filename]  # speed_field as an argument
+    # Launch the simulation using the command sbatch --wait srun.sh filename, passing the velocity field input filename as an argument.
+    command = ["sbatch", "--wait", "srun.sh", filename]  # velocity field as an argument
     command = ["sbatch", "--wait", "srun.sh"] # test
     # command = ["ls"]
     reset_command = ["rm", "-rf", "data/*"]
@@ -79,12 +82,14 @@ def launch_simulation(filename, verbose=True):
         print(e.stderr)
 
 def criterion_tke(train_filename, train_preds, verbose=True):
+    # Create the input file for the simulation using the prediction done by the rl agent, launch the simulation, parse the results, and compute the TKE.
     create_input(train_filename, train_preds, verbose)
     launch_simulation(train_filename, verbose)
     res = parse_results(verbose)
     return compute_tke(res, verbose)
 
 def train(model, input_tensor, nb_epoch, optimizer, criterion, scheduler, verbose=True):
+    # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
     print("Training starts...\n")
     
     history = {'train_loss': [], 'reward': []}
@@ -122,6 +127,7 @@ def train(model, input_tensor, nb_epoch, optimizer, criterion, scheduler, verbos
     return history
 
 def init_train(filename, nb_epoch, verbose=True):
+    # Initialize the training process by parsing the input velocity field, setting up the device (GPU or CPU), creating the model, optimizer, criterion, and scheduler, and then calling the train function.
     train_velocity_field = parse_input(filename, verbose)
 
     if torch.cuda.is_available():
