@@ -1,10 +1,10 @@
 import torch.nn as nn
 
 
-nb_snapshots = 3
+nb_snapshots = 20000
 nb_components = 3 # velocity u, velocity v, velocity w
 nb_channels = nb_components # channels : velocity u, velocity v, velocity w
-ng = [8, 8, 8] # dimensions of the velocity field
+ng = [512, 128, 160] # dimensions of the velocity field
 nb_actions = 10
 
 class RL_FlowControl_Agent(nn.Module):
