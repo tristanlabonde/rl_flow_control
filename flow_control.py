@@ -59,7 +59,7 @@ def create_input(filename, wall_blowing_amps, verbose=True):
                 for y in range(control_length):
                     for i in range(cutting_rate):
                         for j in range(cutting_rate):
-                            f.write(f"{t} {starting_x + i} {y + j} {wall_blowing_amps[t, x*control_width + y]}\n")
+                            f.write(f"{t} {starting_x + x*cutting_rate + i} {y*cutting_rate + j} {wall_blowing_amps[t, x*control_width + y]}\n")
                     
     copy_command = ["cp", filename, "./wall_blowing_input.txt"]
     subprocess.run(copy_command, check=True)
@@ -116,7 +116,7 @@ def train(model, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         log_prob = distribution.log_prob(action_sample).sum()
         action_np = action_sample.cpu().numpy()
         action_np = np.clip(action_np, -1.0, 1.0)
-        train_filename = f"trainings_inputs/training_input_{epoch + 1}.txt"
+        train_filename = f"training_inputs/training_input_{epoch + 1}.txt"
         reward = criterion(train_filename, action_np, verbose)
         loss = -log_prob * reward
         loss.backward()
@@ -129,7 +129,7 @@ def train(model, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         history['train_loss'].append(train_loss)
         history['reward'].append(reward)
 
-        print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.6f}\n\ttrain_loss : {train_loss:>9.3f} - reward : {reward:>9.3f}\n\tactions : {action_np}\n")
+        print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.6f}\n\ttrain_loss : {train_loss:>9.3f} - reward : {reward:>9.3f}\n")
 
     return history
 
