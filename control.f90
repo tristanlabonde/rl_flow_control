@@ -11,7 +11,7 @@ subroutine apply_wall_blowing(n, dl, istep, w, lo)
   real(rp), parameter :: max_blow = 10.0_rp ! Maximum blowing force
 
   integer :: time
-  integer :: file_unit, io_status, read_status, f_x, f_y
+  integer :: file_unit, io_status, read_status, f_x, f_y, gx, gy
   real(rp) :: f_amp
 
   character(len=10) :: time_str
