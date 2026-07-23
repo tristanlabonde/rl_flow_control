@@ -52,7 +52,7 @@ def parse_input(filename, verbose=True):
 def create_input(foldername, wall_blowing_amps, verbose=True):
     if verbose:
         print(f"\tCreating input folder {foldername}")
-    for t in range(1):
+    for t in range(nb_snapshots):
         filename = foldername+"/input"+str(t)+".txt"
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'w') as f:
