@@ -49,20 +49,25 @@ def parse_input(filename, verbose=True):
     velocity_field[2, :, :, ng[2]-1] = means[3][ng[2]-1]
     return velocity_field
 
-def create_input(filename, wall_blowing_amps, verbose=True):
+def create_input(foldername, wall_blowing_amps, verbose=True):
     if verbose:
-        print(f"\tCreating input file {filename}")
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    with open(filename, 'w') as f:
-        for t in range(nb_snapshots):
+        print(f"\tCreating input folder {foldername}")
+    for t in range(1):
+        filename = foldername+"/input"+str(t)+".txt"
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        with open(filename, 'w') as f:
             for x in range(control_width):
                 for y in range(control_length):
                     for i in range(cutting_rate):
                         for j in range(cutting_rate):
-                            f.write(f"{t} {starting_x + x*cutting_rate + i} {y*cutting_rate + j} {wall_blowing_amps[t, x*control_width + y]}\n")
-                    
-    copy_command = ["cp", filename, "./wall_blowing_input.txt"]
-    subprocess.run(copy_command, check=True)
+                            f.write(f"{starting_x + x*cutting_rate + i} {y*cutting_rate + j} {wall_blowing_amps[t, x*control_width + y]}\n")
+            f.close()
+
+    simulation_input = "./wall_blowing_input"
+    remove_command = ["rm", "-rf", simulation_input]
+    lazy_copy_command = ["ln", "-s", foldername, simulation_input]
+    subprocess.run(remove_command, check=True)
+    subprocess.run(lazy_copy_command, check=True)
     
 
 def launch_simulation(verbose=True):
@@ -89,9 +94,9 @@ def launch_simulation(verbose=True):
         print("\033[31mAn error occurred during simulation.\033[0m")
         print(e.stderr)
 
-def criterion_tke(train_filename, train_preds, verbose=True):
+def criterion_tke(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the prediction done by the rl agent, launch the simulation, parse the results, and compute the TKE.
-    create_input(train_filename, train_preds, verbose)
+    create_input(train_foldername, train_preds, verbose)
     launch_simulation(verbose)
     res = parse_results(verbose)
     return compute_tke(res, verbose)
@@ -116,8 +121,8 @@ def train(model, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         log_prob = distribution.log_prob(action_sample).sum()
         action_np = action_sample.cpu().numpy()
         action_np = np.clip(action_np, -1.0, 1.0)
-        train_filename = f"training_inputs/training_input_{epoch + 1}.txt"
-        reward = criterion(train_filename, action_np, verbose)
+        train_foldername = f"training_inputs/training_input_epoch{epoch + 1}"
+        reward = criterion(train_foldername, action_np, verbose)
         loss = -log_prob * reward
         loss.backward()
         optimizer.step()
