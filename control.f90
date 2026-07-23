@@ -1,14 +1,14 @@
 module mod_blowing
 contains
-subroutine apply_wall_blowing(n, dl, istep, w)
+subroutine apply_wall_blowing(n, dl, istep, w, lo)
   use mod_param, only: rp
   implicit none
 
-  integer, intent(in) :: n(3), istep
+  integer, intent(in) :: n(3), istep, lo(3)
   real(rp), intent(in) :: dl(3)
   real(rp), intent(inout) :: w(0:,0:,0:)
 
-  real(rp), parameter :: max_blow = 1.0_rp ! Maximum blowing force
+  real(rp), parameter :: max_blow = 10.0_rp ! Maximum blowing force
 
   integer :: time
   integer :: file_unit, io_status, read_status, f_x, f_y
@@ -30,13 +30,20 @@ subroutine apply_wall_blowing(n, dl, istep, w)
     read(file_unit, *, iostat=read_status) f_x, f_y, f_amp
 
     if (read_status < 0) exit
-    if (read_status >0) then
+    if (read_status > 0) then
       print *, "ERROR: Error while reading the file"
       exit
     end if
-    
-    w(f_x, f_y, 0) = max_blow * f_amp
+
+    gx = lo(1) - 1 + f_x ! Indice x global
+    gy = lo(2) - 1 + f_y ! Indice y global
+    if (gx >= 101 .and. gx <= 164 .and. gy >= 1 .and. gy <= 128) then
+      w(f_x, f_y, 0) = max_blow * f_amp
+      w(f_x, f_y, 0) = max_blow * f_amp
+    end if
   end do
+  
+  !$acc update device(w(:,:,0:1))
   
   close(file_unit)
 

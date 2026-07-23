@@ -4,9 +4,12 @@ __pycache__
 *.bin
 *.out
 *.xmf
+training_inputs
+wall_blowing_input
 # Too heavy
 res_v0.1 
 res_v0.3
 res_v0.4
-training_inputs
-wall_blowing_input
+max_blow_global_5_data
+max_blow_global_data
+max_blow_z1_5_data
