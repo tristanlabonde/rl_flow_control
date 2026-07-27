@@ -27,7 +27,7 @@ def compute_tke(variances, verbose=True):
     if variances is None:
         if verbose:
             print("\033[31mInvalid results detected.\033[0m")
-        return float('-inf')  # Return a low reward if results are invalid
+        return -1  # Return a low reward if results are invalid
     
     y = variances[0]
     u_prime2 = variances[1]
@@ -126,7 +126,10 @@ def train(model, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         action_np = np.clip(action_np, -1.0, 1.0)
         train_foldername = f"training_inputs/training_input_epoch{epoch + 1}"
         reward = criterion(train_foldername, action_np, verbose)
-        loss = -log_prob * reward
+        if reward == -1:
+            loss = 1e6
+        else:
+            loss = -log_prob * reward
         loss.backward()
         optimizer.step()
         train_loss = loss.item()
