@@ -10,6 +10,10 @@ def parse_results(verbose=True): #results are stored in data/
     if verbose:
         print("\tParsing results...")
 
+    filepath = os.path.join("data", "x_bin")
+    if not os.path.exists(filepath):
+        return None
+    
     results_file = "data/stats1d.out"
     
     data = np.loadtxt(results_file)
@@ -17,13 +21,13 @@ def parse_results(verbose=True): #results are stored in data/
     return res
 
 def compute_tke(variances, verbose=True):
-    # Compute the loss/tke (Turbulent Kinetic Energy) from the output of the simulation.
+    # Compute the reward/tke (Turbulent Kinetic Energy) from the output of the simulation.
     if verbose:
         print("\tComputing reward...")
     if variances is None:
         if verbose:
             print("\033[31mInvalid results detected.\033[0m")
-        return float('inf')  # Return a high loss if results are invalid
+        return float('-inf')  # Return a low reward if results are invalid
     
     y = variances[0]
     u_prime2 = variances[1]
@@ -78,17 +82,17 @@ def launch_simulation(verbose=True):
     if verbose:
         print("\tCleaning previous results...")
     subprocess.run(reset_command, check=True)
-
     try:
         if verbose:
             print("\tLaunching simulation...")
-        res = subprocess.run(
+        subprocess.run(
             command,
             capture_output=True,
             text=True,
             check=True
         )
-        return res.returncode
+        if verbose:
+            print("\tSimulation completed successfully.")
     except subprocess.CalledProcessError as e:
         print("\033[31mAn error occurred during simulation.\033[0m")
         print(e.stderr)
@@ -96,13 +100,7 @@ def launch_simulation(verbose=True):
 def criterion_tke(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the prediction done by the rl agent, launch the simulation, parse the results, and compute the TKE.
     create_input(train_foldername, train_preds, verbose)
-    returncode = launch_simulation(verbose)
-    if returncode != 0:
-        if verbose:
-            print("\tSimulation aborted. Letting agent learning.")
-        return float('-inf')
-    if verbose:
-        print("\tSimulation completed successfully.")
+    launch_simulation(verbose)
     res = parse_results(verbose)
     return compute_tke(res, verbose)
 
