@@ -88,8 +88,7 @@ def launch_simulation(verbose=True):
             text=True,
             check=True
         )
-        if verbose:
-            print("\tSimulation completed successfully.")
+        return res.returncode
     except subprocess.CalledProcessError as e:
         print("\033[31mAn error occurred during simulation.\033[0m")
         print(e.stderr)
@@ -97,7 +96,13 @@ def launch_simulation(verbose=True):
 def criterion_tke(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the prediction done by the rl agent, launch the simulation, parse the results, and compute the TKE.
     create_input(train_foldername, train_preds, verbose)
-    launch_simulation(verbose)
+    returncode = launch_simulation(verbose)
+    if returncode != 0:
+        if verbose:
+            print("\tSimulation aborted. Letting agent learning.")
+        return float('-inf')
+    if verbose:
+        print("\tSimulation completed successfully.")
     res = parse_results(verbose)
     return compute_tke(res, verbose)
 
