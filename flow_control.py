@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import time
 import os
-from rl_fc_model import RL_FlowControl_Agent, nb_snapshots, nb_components, ng, starting_x, control_width, control_length, cutting_rate
+import rl_fc_models as model
 
 def parse_results(verbose=True): #results are stored in data/
     # Read the results of the simulation from the output file stats1d.out and return a 4 x height array where row 0 is the height, row 1 is the u-velocity variance, row 2 is the v-velocity variance and row 3 is the w-velocity variance.
@@ -47,24 +47,24 @@ def parse_input(filename, verbose=True):
     data = np.loadtxt(filename)
     means = np.array([data[:, 0], data[:, 1], data[:, 2], data[:, 3]]) # position z, means of u, v, w on the x-y corresponding planes
 
-    velocity_field = np.zeros((nb_components, ng[0], ng[1], ng[2]))
-    for z in range(ng[2]):
+    velocity_field = np.zeros((model.nb_components, model.ng[0], model.ng[1], model.ng[2]))
+    for z in range(model.ng[2]):
         velocity_field[0, :, :, z] = means[1][z]
-    velocity_field[2, :, :, ng[2]-1] = means[3][ng[2]-1]
+    velocity_field[2, :, :, model.ng[2]-1] = means[3][model.ng[2]-1]
     return velocity_field
 
 def create_input(foldername, wall_blowing_amps, verbose=True):
     if verbose:
         print(f"\tCreating input folder {foldername}")
-    for t in range(nb_snapshots):
+    for t in range(model.nb_snapshots):
         filename = foldername+"/input"+str(t)+".txt"
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'w') as f:
-            for x in range(control_width):
-                for y in range(control_length):
-                    for i in range(cutting_rate):
-                        for j in range(cutting_rate):
-                            f.write(f"{starting_x + x*cutting_rate + i} {y*cutting_rate + j} {wall_blowing_amps[t, x*control_width + y]}\n")
+            for x in range(model.control_width):
+                for y in range(model.control_length):
+                    for i in range(model.cutting_rate):
+                        for j in range(model.cutting_rate):
+                            f.write(f"{model.starting_x + x*model.cutting_rate + i} {y*model.cutting_rate + j} {wall_blowing_amps[t, x, y]}\n")
             f.close()
 
     simulation_input = "./wall_blowing_input"
@@ -104,11 +104,10 @@ def criterion_tke(train_foldername, train_preds, verbose=True):
     res = parse_results(verbose)
     return compute_tke(res, verbose)
 
-def train(model, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler, verbose=True):
+def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler, verbose=True):
     # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
     print("Training starts...\n")
-    
-    history = {'train_loss': [], 'reward': []}
+
     exploration_noise = 0.1
 
     for epoch in range(nb_epoch):
@@ -116,9 +115,9 @@ def train(model, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
             print(f"Epoch {epoch + 1}/{nb_epoch}")
         #valid_loss = 0.0
 
-        model.train()
+        agent.train()
         optimizer.zero_grad()
-        action_mean = model(input_velocity_tensor, input_time_tensor)
+        action_mean = agent(input_velocity_tensor, input_time_tensor)
         distribution = torch.distributions.Normal(action_mean, exploration_noise)
         action_sample = distribution.sample()
         log_prob = distribution.log_prob(action_sample).sum()
@@ -134,17 +133,12 @@ def train(model, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         #scheduler.step(valid_loss) 
         current_lr = optimizer.param_groups[0]['lr']
 
-        history['train_loss'].append(train_loss)
-        history['reward'].append(reward)
-
         print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.6f}\n\ttrain_loss : {train_loss:>9.3f} - reward : {reward:>9.3f}\n")
-
-    return history
 
 def init_train(filename, nb_epoch, verbose=True):
     # Initialize the training process by parsing the input velocity field, setting up the device (GPU or CPU), creating the model, optimizer, criterion, and scheduler, and then calling the train function.
     train_velocity_field = parse_input(filename, verbose)
-    time_steps = torch.linspace(0.0, 1.0, nb_snapshots).unsqueeze(1)
+    time_steps = torch.linspace(0.0, 1.0, model.nb_snapshots).unsqueeze(1)
 
     if torch.cuda.is_available():
         print(f"GPU found : {torch.cuda.get_device_name(0)}")
@@ -158,13 +152,13 @@ def init_train(filename, nb_epoch, verbose=True):
 
     input_velocity_tensor = torch.from_numpy(np.array([train_velocity_field])).float().to(device)
     input_time_tensor = time_steps.to(device)
-    model = RL_FlowControl_Agent().to(device)
+    agent = model.FlowControlGrid().to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=0.001)
     criterion = criterion_tke
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.5,patience=2)
 
     start = time.time()
-    history = train(model, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler)
+    train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler)
     end = time.time()
     print(f"Training took {end-start:.3f}s")
