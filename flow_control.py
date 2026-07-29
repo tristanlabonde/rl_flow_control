@@ -11,7 +11,9 @@ def parse_results(jobid, verbose=True): #results are stored in data/
     if verbose:
         print("\tParsing results...")
 
-    with open('jobs/stdout.' + jobid, 'r', encoding='utf-8') as f:
+    if jobid == -1:
+        return None
+    with open('./jobs/stdout.' + jobid, 'r', encoding='utf-8') as f:
         derniere_ligne = deque(f, maxlen=1)[0]
         if derniere_ligne.strip() != "*** Fim ***":
             return None
@@ -87,7 +89,7 @@ def launch_simulation(verbose=True):
     try:
         if verbose:
             print("\tLaunching simulation...")
-        subprocess.run(
+        res = subprocess.run(
             command,
             capture_output=True,
             text=True,
@@ -95,15 +97,18 @@ def launch_simulation(verbose=True):
         )
         if verbose:
             print("\tSimulation completed successfully.")
+        jobid = ((res.stdout).split())[-1]
+        return jobid
     except subprocess.CalledProcessError as e:
         print("\033[31mAn error occurred during simulation.\033[0m")
         print(e.stderr)
+        return -1
 
 def criterion_tke(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the prediction done by the rl agent, launch the simulation, parse the results, and compute the TKE.
     create_input(train_foldername, train_preds, verbose)
-    launch_simulation(verbose)
-    res = parse_results(verbose)
+    jobid = launch_simulation(verbose)
+    res = parse_results(jobid, verbose)
     return compute_tke(res, verbose)
 
 def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler, verbose=True):
