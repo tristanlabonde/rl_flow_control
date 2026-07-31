@@ -39,7 +39,7 @@ subroutine apply_wall_blowing(n, dl, istep, w, lo)
     gy = lo(2) - 1 + f_y + 1 ! Indice y global
     if (gx >= 101 .and. gx <= 164 .and. gy >= 1 .and. gy <= 128) then
       w(f_x, f_y, 0) = max_blow * f_amp
-      w(f_x, f_y, 0) = max_blow * f_amp
+      w(f_x, f_y, 1) = w(f_x, f_y, 0)
     end if
   end do
   
