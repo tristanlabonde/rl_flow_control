@@ -6,10 +6,6 @@ __pycache__
 *.xmf
 training_inputs
 wall_blowing_input
+tmp.py
 # Too heavy
-res_v0.1 
-res_v0.3
-res_v0.4
-max_blow_global_5_data
-max_blow_global_data
-max_blow_z1_5_data
+data
