@@ -57,18 +57,18 @@ def parse_input(filename, verbose=True):
     velocity_field[2, :, :, model.ng[2]-1] = means[3][model.ng[2]-1]
     return velocity_field
 
-def create_input(foldername, wall_blowing_amps, verbose=True):
+def create_grids_input(foldername, wall_blowing_amps, verbose=True):
     if verbose:
         print(f"\tCreating input folder {foldername}")
     for t in range(model.nb_snapshots):
-        filename = foldername+"/input"+str(t)+".txt"
+        filename = foldername+"/grids_input"+str(t)+".txt"
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'w') as f:
             for x in range(model.control_width):
                 for y in range(model.control_length):
                     for i in range(model.cutting_rate):
                         for j in range(model.cutting_rate):
-                            f.write(f"{model.starting_x + x*model.cutting_rate + i} {y*model.cutting_rate + j} {wall_blowing_amps[t, x, y]:.3f}\n")
+                            f.write(f"{model.starting_x + x*model.cutting_rate + i} {y*model.cutting_rate + j} {wall_blowing_amps[t, x, y]}\n")
             f.close()
 
     simulation_input = "./wall_blowing_input"
@@ -77,6 +77,24 @@ def create_input(foldername, wall_blowing_amps, verbose=True):
     subprocess.run(remove_command, check=True)
     subprocess.run(lazy_copy_command, check=True)
     
+def create_single_grid_input(foldername, wall_blowing_amps, verbose=True):
+    if verbose:
+        print(f"\tCreating input folder {foldername}")
+    filename = foldername+"/single_grid_input.txt"
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, 'w') as f:
+        for x in range(model.control_width):
+            for y in range(model.control_length):
+                for i in range(model.cutting_rate):
+                    for j in range(model.cutting_rate):
+                        f.write(f"{model.starting_x + x*model.cutting_rate + i} {y*model.cutting_rate + j} {wall_blowing_amps[0, x, y]}\n")
+        f.close()
+
+    simulation_input = "./wall_blowing_input"
+    remove_command = ["rm", "-rf", simulation_input]
+    lazy_copy_command = ["ln", "-s", foldername, simulation_input]
+    subprocess.run(remove_command, check=True)
+    subprocess.run(lazy_copy_command, check=True)
 
 def launch_simulation(verbose=True):
     # Launch the simulation using the command sbatch --wait srun.sh.
@@ -104,9 +122,17 @@ def launch_simulation(verbose=True):
         print(e.stderr)
         return -1
 
-def criterion_tke(train_foldername, train_preds, verbose=True):
-    # Create the input file for the simulation using the prediction done by the rl agent, launch the simulation, parse the results, and compute the TKE.
-    create_input(train_foldername, train_preds, verbose)
+def criterion_tke_grids(train_foldername, train_preds, verbose=True):
+    # Create the input file for the simulation using the grids predicted by the rl agent, launch the simulation, parse the results, and compute the TKE.
+    create_grids_input(train_foldername, train_preds, verbose)
+    jobid = launch_simulation(verbose)
+    res = parse_results(jobid, verbose)
+    return compute_tke(res, verbose)
+
+
+def criterion_tke_single_grid(train_foldername, train_preds, verbose=True):
+    # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute the TKE.
+    create_single_grid_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
     res = parse_results(jobid, verbose)
     return compute_tke(res, verbose)
@@ -159,10 +185,10 @@ def init_train(filename, nb_epoch, verbose=True):
 
     input_velocity_tensor = torch.from_numpy(np.array([train_velocity_field])).float().to(device)
     input_time_tensor = time_steps.to(device)
-    agent = model.FlowControlGrid().to(device)
+    agent = model.FlowControlCoeffSingleGrid().to(device)
 
     optimizer = torch.optim.Adam(agent.parameters(), lr=0.001)
-    criterion = criterion_tke
+    criterion = criterion_tke_single_grid
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.5,patience=2)
 
     start = time.time()

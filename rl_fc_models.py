@@ -12,7 +12,7 @@ control_width = 64//cutting_rate
 control_length = ng[1]//cutting_rate
 nb_actions = control_width * control_length
 
-class FlowControlGrid(nn.Module):
+class FlowControlGrids(nn.Module): # Predict 1 per time step
     def __init__(self):
         super().__init__()
         self.conv = nn.Sequential(
@@ -64,7 +64,47 @@ class FlowControlGrid(nn.Module):
         return self.final(x).reshape(-1, control_width, control_length)
 
 
-class FlowControlCoeff(nn.Module):
+class FlowControlSingleGrid(nn.Module): # Predict only 1 grid to apply at each time step, continuous in time
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv3d(nb_channels, 16, kernel_size=3, padding=1),
+            nn.BatchNorm3d(16),
+            nn.ReLU(),
+            nn.MaxPool3d(kernel_size=4),
+
+            nn.Conv3d(16, 32, kernel_size=3, padding=1),
+            nn.BatchNorm3d(32),
+            nn.ReLU(),
+            nn.MaxPool3d(kernel_size=2),
+
+            nn.Conv3d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm3d(64),
+            nn.ReLU(),
+            nn.MaxPool3d(kernel_size=2),
+            
+            nn.Flatten()
+        )
+        
+        self.reduce = nn.Sequential(
+            nn.Linear(ng[0]*ng[1]*ng[2]//64, ng[0]*ng[1]*ng[2]//(1024*cutting_rate)),
+            nn.ReLU()
+        )
+
+        self.final = nn.Sequential(
+            nn.Linear(ng[0]*ng[1]*ng[2]//(1024*cutting_rate), nb_actions),
+            nn.Tanh()
+        )
+        
+    def forward(self, velocity_profile, time_vector):
+
+        v = self.conv(velocity_profile)
+        v = self.reduce(v)
+        
+        return self.final(v).reshape(-1, control_width, control_length)
+
+
+class FlowControlCoeffGrids(nn.Module): # Fourier series coefficients, 1 grid per time step
     def __init__(self):
         super().__init__()
         self.conv = nn.Sequential(
@@ -105,11 +145,9 @@ class FlowControlCoeff(nn.Module):
         y_grid = torch.linspace(0.0, control_length, control_length)
         k_modes = torch.arange(1, nb_actions + 1, dtype=torch.float32)
 
-        # Matrice (Nx, K) et Matrice (Ny, K)
         sin_x = torch.sin(torch.pi * x_grid.unsqueeze(1) * k_modes.unsqueeze(0))
         sin_y = torch.sin(torch.pi * y_grid.unsqueeze(1) * k_modes.unsqueeze(0))
 
-        # Enregistrement dans les buffers GPU/CPU
         self.register_buffer('sin_x', sin_x)
         self.register_buffer('sin_y', sin_y)
         
@@ -126,13 +164,63 @@ class FlowControlCoeff(nn.Module):
         x = torch.cat((v, t), dim=1)
 
         a = self.final(x)
-        print("A : ", a.shape)
         w = torch.einsum('tk, xk, yk -> txy', a, self.sin_x, self.sin_y)
-        print("W : ", w.shape)
+        
+        return w
+
+class FlowControlCoeffSingleGrid(nn.Module): # Fourier series coefficients, 1 grid for all time steps, continuous in time
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv3d(nb_channels, 16, kernel_size=3, padding=1),
+            nn.BatchNorm3d(16),
+            nn.ReLU(),
+            nn.MaxPool3d(kernel_size=4),
+
+            nn.Conv3d(16, 32, kernel_size=3, padding=1),
+            nn.BatchNorm3d(32),
+            nn.ReLU(),
+            nn.MaxPool3d(kernel_size=2),
+
+            nn.Conv3d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm3d(64),
+            nn.ReLU(),
+            nn.MaxPool3d(kernel_size=2),
+            
+            nn.Flatten()
+        )
+        
+        self.reduce = nn.Sequential(
+            nn.Linear(ng[0]*ng[1]*ng[2]//64, ng[0]*ng[1]*ng[2]//(1024*cutting_rate)),
+            nn.ReLU()
+        )
+
+        self.final = nn.Sequential(
+            nn.Linear(ng[0]*ng[1]*ng[2]//(1024*cutting_rate), nb_actions),
+            nn.Tanh()
+        )
+
+        x_grid = torch.linspace(starting_x, starting_x + control_width, control_width)
+        y_grid = torch.linspace(0.0, control_length, control_length)
+        k_modes = torch.arange(1, nb_actions + 1, dtype=torch.float32)
+
+        sin_x = torch.sin(torch.pi * x_grid.unsqueeze(1) * k_modes.unsqueeze(0))
+        sin_y = torch.sin(torch.pi * y_grid.unsqueeze(1) * k_modes.unsqueeze(0))
+
+        self.register_buffer('sin_x', sin_x)
+        self.register_buffer('sin_y', sin_y)
+        
+    def forward(self, velocity_profile, time_vector):
+
+        v = self.conv(velocity_profile)
+        v = self.reduce(v)
+
+        a = self.final(v)
+        w = torch.einsum('tk, xk, yk -> txy', a, self.sin_x, self.sin_y)
         
         return w
     
-class ContinuousFlowControlGrid(nn.Module): # PINN
+class FlowControlPINN(nn.Module): # PINN, doesn't compile
     def __init__(self):
         super().__init__()
         self.branch_net = nn.Sequential(

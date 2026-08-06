@@ -20,7 +20,7 @@ subroutine apply_wall_blowing(n, dl, istep, w, lo)
   write(time_str, '(I0)') time
   f_amp = 0.0_rp
   file_unit = 99
-  open(unit=file_unit, file="wall_blowing_input/input"//trim(adjustl(time_str))//".txt", status="old", action="read", iostat=io_status)
+  open(unit=file_unit, file="wall_blowing_input/grids_input"//trim(adjustl(time_str))//".txt", status="old", action="read", iostat=io_status)
   if (io_status /= 0) then
     print *, "ERROR: Unable to open file"
     return

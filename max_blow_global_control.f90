@@ -8,7 +8,7 @@ subroutine apply_wall_blowing(n, dl, istep, w, lo)
   real(rp), intent(in) :: dl(3)
   real(rp), intent(inout) :: w(0:,0:,0:)
 
-  real(rp), parameter :: max_blow = -0.8_rp ! Maximum blowing force
+  real(rp), parameter :: max_blow = 0.8_rp ! Maximum blowing force
 
   integer :: x, y, gx, gy
 
