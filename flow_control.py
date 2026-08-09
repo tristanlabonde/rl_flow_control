@@ -87,7 +87,7 @@ def create_single_grid_input(foldername, wall_blowing_amps, verbose=True):
             for y in range(model.control_length):
                 for i in range(model.cutting_rate):
                     for j in range(model.cutting_rate):
-                        f.write(f"{model.starting_x + x*model.cutting_rate + i} {y*model.cutting_rate + j} {wall_blowing_amps[0, x, y]}\n")
+                        f.write(f"{model.starting_x + x*model.cutting_rate + i} {y*model.cutting_rate + j} {wall_blowing_amps[x, y]}\n")
         f.close()
 
     simulation_input = "./wall_blowing_input"
