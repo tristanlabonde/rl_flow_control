@@ -9,16 +9,19 @@ subroutine apply_wall_blowing(n, dl, istep, time, w, lo)
   real(rp), intent(inout) :: w(0:,0:,0:)
 
   real(rp), parameter :: max_blow = 0.8_rp ! Maximum blowing force
+  integer, parameter :: pulse_length = 2 ! Length of the blowing pulse
 
   integer :: file_unit, io_status, read_status, f_x, f_y, gx, gy
   real(rp) :: f_amp
 
-  character(len=10) :: step_str
+  if (MOD(istep, 10) >= pulse_length) then
+    ! blow omly on the first two time steps of each 10 step
+    return
+  end if
 
-  write(step_str, '(I0)') (istep - 1)
   f_amp = 0.0_rp
   file_unit = 99
-  open(unit=file_unit, file="wall_blowing_input/grids_input"//trim(adjustl(step_str))//".txt", status="old", action="read", iostat=io_status)
+  open(unit=file_unit, file="wall_blowing_input/single_grid_input.txt", status="old", action="read", iostat=io_status)
   if (io_status /= 0) then
     print *, "ERROR: Unable to open file"
     return

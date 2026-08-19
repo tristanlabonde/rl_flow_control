@@ -1,19 +1,18 @@
 module mod_blowing
 contains
-subroutine apply_wall_blowing(n, dl, istep, w, lo)
+subroutine apply_wall_blowing(n, dl, istep, time, w, lo)
   use mod_param, only: rp
   implicit none
 
   integer, intent(in) :: n(3), istep, lo(3)
-  real(rp), intent(in) :: dl(3)
+  real(rp), intent(in) :: dl(3), time
   real(rp), intent(inout) :: w(0:,0:,0:)
 
   real(rp), parameter :: max_blow = 1.0_rp ! Maximum blowing force
   real(kind=8), parameter :: pi = 4.0_8 * ATAN(1.0_8)
 
-  integer :: time, x, y, gx, gy
+  integer :: x, y, gx, gy
 
-  time = istep - 1
   do y = 1, n(2)
     gy = lo(2) - 1 + y ! Indice y global
     do x = 1, n(1)

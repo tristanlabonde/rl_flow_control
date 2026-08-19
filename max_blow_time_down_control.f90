@@ -1,11 +1,11 @@
 module mod_blowing
 contains
-subroutine apply_wall_blowing(n, dl, istep, w, lo)
+subroutine apply_wall_blowing(n, dl, istep, time, w, lo)
   use mod_param, only: rp
   implicit none
 
   integer, intent(in) :: n(3), istep, lo(3)
-  real(rp), intent(in) :: dl(3)
+  real(rp), intent(in) :: dl(3), time
   real(rp), intent(inout) :: w(0:,0:,0:)
 
   real(rp), parameter :: max_blow = 0.9_rp ! Maximum blowing force
