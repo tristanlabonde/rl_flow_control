@@ -1,21 +1,21 @@
 module mod_blowing
 contains
-subroutine apply_wall_blowing(n, dl, istep, time, w, lo)
+subroutine apply_wall_blowing(n, istep, time, w)
   use mod_param, only: rp
   implicit none
 
-  integer, intent(in) :: n(3), istep, lo(3)
-  real(rp), intent(in) :: dl(3), time
+  integer, intent(in) :: n(3), istep
+  real(rp), intent(in) :: time
   real(rp), intent(inout) :: w(0:,0:,0:)
 
   real(rp), parameter :: max_blow = 0.8_rp ! Maximum blowing force
-  integer, parameter :: pulse_length = 2 ! Length of the blowing pulse
+  integer, parameter :: pulse_length = 1 ! Length of the blowing pulse
 
   integer :: file_unit, io_status, read_status, f_x, f_y, gx, gy
   real(rp) :: f_amp
 
   if (MOD(istep, 10) >= pulse_length) then
-    ! blow omly on the first two time steps of each 10 step
+    ! blow omly on the first pulse_length time steps of each 10 step
     return
   end if
 
@@ -36,15 +36,12 @@ subroutine apply_wall_blowing(n, dl, istep, time, w, lo)
       exit
     end if
 
-    gx = lo(1) - 1 + f_x + 1 ! Indice x global
-    gy = lo(2) - 1 + f_y + 1 ! Indice y global
-    if (gx >= 101 .and. gx <= 164 .and. gy >= 1 .and. gy <= 128) then
-      w(f_x, f_y, 0) = max_blow * f_amp
-      w(f_x, f_y, 1) = w(f_x, f_y, 0)
-    end if
+    gx = f_x + 1 ! Indice x global
+    gy = f_y + 1 ! Indice y global
+    w(gx, gy, 1) = max_blow * f_amp
   end do
   
-  !$acc update device(w(:,:,0:1))
+  !$acc update device(w(:,:,1))
   
   close(file_unit)
 

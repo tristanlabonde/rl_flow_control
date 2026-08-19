@@ -532,7 +532,7 @@ program cans
   !$acc enter data copyin(u,v,w,p,dudtrko,dvdtrko,dwdtrko) create(pp)
   call bounduvw(cbcvel,n,bcvel,nb,is_bound,.false.,dl,dzc,dzf,u,v,w,time)
 ! blowing control (tristan labonde)
-  call apply_wall_blowing(n, dl, istep,time, w, lo)
+  call apply_wall_blowing(n, istep, time, w)
 !
   call boundp(cbcpre,n,bcpre,nb,is_bound,dl,dzc,p)
   do iscal=1,nscal
@@ -611,7 +611,7 @@ program cans
       end if
       call bounduvw(cbcvel,n,bcvel,nb,is_bound,.false.,dl,dzc,dzf,u,v,w,time)
 ! blowing control (tristan labonde)
-      call apply_wall_blowing(n, dl, istep, time, w, lo)
+      call apply_wall_blowing(n, istep, time, w)
 !
       call fillps(n,dli,dzfi,dtrki,u,v,w,pp)
       call updt_rhs_b(['c','c','c'],cbcpre,n,is_bound,rhsbp%x,rhsbp%y,rhsbp%z,pp)
@@ -620,7 +620,7 @@ program cans
       call correc(n,dli,dzci,dtrk,pp,u,v,w)
       call bounduvw(cbcvel,n,bcvel,nb,is_bound,.true.,dl,dzc,dzf,u,v,w,time)
 ! blowing control (tristan labonde)
-      call apply_wall_blowing(n, dl, istep, time, w, lo)
+      call apply_wall_blowing(n, istep, time, w)
 !
       call updatep(n,dli,dzci,dzfi,alpha,pp,p)
       call boundp(cbcpre,n,bcpre,nb,is_bound,dl,dzc,p)
