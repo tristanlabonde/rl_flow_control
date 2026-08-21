@@ -6,6 +6,5 @@ __pycache__
 *.xmf
 training_inputs
 wall_blowing_input
-tmp.py
 # Too heavy
 data

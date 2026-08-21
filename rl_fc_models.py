@@ -142,12 +142,12 @@ class FlowControlCoeffGrids(nn.Module): # Fourier series coefficients, 1 grid pe
             nn.Tanh()
         )
 
-        x_grid = starting_x + torch.linspace(0.0, control_width, control_width)*cutting_rate
-        y_grid = torch.linspace(0.0, control_length, control_length)*cutting_rate
+        x_grid = starting_x + torch.arange(0, control_width, dtype=torch.float32)*cutting_rate
+        y_grid = torch.arange(0, control_length, dtype=torch.float32)*cutting_rate
         k_modes = torch.arange(1, nb_coeffs + 1, dtype=torch.float32)
 
-        sin_x = torch.sin(2*torch.pi/(control_width * cutting_rate) * x_grid.unsqueeze(0) * k_modes.unsqueeze(1))
-        sin_y = torch.sin(2*torch.pi/(control_length * cutting_rate) * y_grid.unsqueeze(0) * k_modes.unsqueeze(1))
+        sin_x = torch.sin(2*torch.pi/(control_width * cutting_rate) * k_modes.unsqueeze(1) * x_grid.unsqueeze(0))
+        sin_y = torch.sin(2*torch.pi/(control_length * cutting_rate) * k_modes.unsqueeze(1) * y_grid.unsqueeze(0))
 
         self.register_buffer('sin_x', sin_x)
         self.register_buffer('sin_y', sin_y)
@@ -165,12 +165,14 @@ class FlowControlCoeffGrids(nn.Module): # Fourier series coefficients, 1 grid pe
         x = torch.cat((v, t), dim=1)
 
         a = self.final(x)
+        W = torch.zeros((num_snapshots, control_width, control_length), device=a.device)
         for c in a:
             w = torch.zeros((control_width, control_length), device=c.device)
             for i in range(nb_coeffs):
-                w += c * self.sin_x[i].unsqueeze(1) * self.sin_y[i]
+                w += c[i] * self.sin_x[i].unsqueeze(1) * self.sin_y[i].unsqueeze(0)
+            W.append(w)
         
-        return w
+        return W
 
 class FlowControlCoeffSingleGrid(nn.Module): # Fourier series coefficients, 1 grid for all time steps, continuous in time
     def __init__(self):
@@ -204,12 +206,12 @@ class FlowControlCoeffSingleGrid(nn.Module): # Fourier series coefficients, 1 gr
             nn.Tanh()
         )
 
-        x_grid = starting_x + torch.linspace(0.0, control_width, control_width)*cutting_rate
-        y_grid = torch.linspace(0.0, control_length, control_length)*cutting_rate
+        x_grid = starting_x + torch.arange(0, control_width, dtype=torch.float32)*cutting_rate
+        y_grid = torch.arange(0, control_length, dtype=torch.float32)*cutting_rate
         k_modes = torch.arange(1, nb_coeffs + 1, dtype=torch.float32)
 
-        sin_x = torch.sin(2*torch.pi/(control_width * cutting_rate) * x_grid.unsqueeze(0) * k_modes.unsqueeze(1))
-        sin_y = torch.sin(2*torch.pi/(control_length * cutting_rate) * y_grid.unsqueeze(0) * k_modes.unsqueeze(1))
+        sin_x = torch.sin(2*torch.pi/(control_width * cutting_rate) * k_modes.unsqueeze(1) * x_grid.unsqueeze(0))
+        sin_y = torch.sin(2*torch.pi/(control_length * cutting_rate) * k_modes.unsqueeze(1) * y_grid.unsqueeze(0))
 
         self.register_buffer('sin_x', sin_x)
         self.register_buffer('sin_y', sin_y)
@@ -220,10 +222,11 @@ class FlowControlCoeffSingleGrid(nn.Module): # Fourier series coefficients, 1 gr
         v = self.reduce(v)
 
         a = self.final(v)
-        for c in a:
-            w = torch.zeros((control_width, control_length), device=c.device)
-            for i in range(nb_coeffs):
-                w += c * self.sin_x[i].unsqueeze(1) * self.sin_y[i]
+        c = a[0]
+        w = torch.zeros((control_width, control_length), device=c.device)
+
+        for i in range(nb_coeffs):
+            w += c[i] * self.sin_x[i].unsqueeze(1) * self.sin_y[i].unsqueeze(0)
         
         return w
     

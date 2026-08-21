@@ -141,7 +141,7 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
     # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
     print("Training starts...\n")
 
-    exploration_noise = 0.1
+    exploration_noise = 0.01
 
     for epoch in range(nb_epoch):
         if verbose:

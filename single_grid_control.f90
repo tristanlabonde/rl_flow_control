@@ -1,14 +1,14 @@
 module mod_blowing
 contains
-subroutine apply_wall_blowing(n, istep, time, w)
+subroutine apply_wall_blowing(istep, time, w)
   use mod_param, only: rp
   implicit none
 
-  integer, intent(in) :: n(3), istep
+  integer, intent(in) :: istep
   real(rp), intent(in) :: time
   real(rp), intent(inout) :: w(0:,0:,0:)
 
-  real(rp), parameter :: max_blow = 0.8_rp ! Maximum blowing force
+  real(rp), parameter :: max_blow = 0.1_rp ! Maximum blowing force
 
   integer :: file_unit, io_status, read_status, f_x, f_y, gx, gy
   real(rp) :: f_amp
@@ -32,12 +32,13 @@ subroutine apply_wall_blowing(n, istep, time, w)
 
     gx = f_x + 1 ! Indice x global
     gy = f_y + 1 ! Indice y global
-    w(gx, gy, 1) = max_blow * f_amp
+    w(gx, gy, 0) = max_blow * f_amp
   end do
-  
-  !$acc update device(w(:,:,1))
-  
-  close(file_unit)
 
+  close(file_unit)
+  
+  !$acc update device(w(:,:,0))
+  !$acc wait
+  
 end subroutine apply_wall_blowing
 end module mod_blowing
