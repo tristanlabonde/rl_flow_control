@@ -6,6 +6,8 @@ import os
 import rl_fc_models as model
 from collections import deque
 
+TKE_ref = 0
+
 def parse_results(jobid, verbose=True): #results are stored in data/
     # Read the results of the simulation from the output file stats1d.out and return a 4 x height array where row 0 is the height, row 1 is the u-velocity variance, row 2 is the v-velocity variance and row 3 is the w-velocity variance.
     if verbose:
@@ -24,14 +26,14 @@ def parse_results(jobid, verbose=True): #results are stored in data/
     res = np.array([data[:, 0], data[:, 4], data[:, 5], data[:, 6]])
     return res
 
-def compute_tke(variances, verbose=True):
-    # Compute the reward/tke (Turbulent Kinetic Energy) from the output of the simulation.
+def compute_scaled_tke(variances, verbose=True):
+    # Compute the reward/tke (Turbulent Kinetic Energy) from the given variances of the simulation.
     if verbose:
-        print("\tComputing reward...")
+        print("\tComputing scaled tke...")
     if variances is None:
         if verbose:
             print("\033[31mInvalid results detected.\033[0m")
-        return -1e6  # Return a low reward if results are invalid
+        return -1  # Return a low reward if results are invalid
     
     y = variances[0]
     u_prime2 = variances[1]
@@ -41,8 +43,16 @@ def compute_tke(variances, verbose=True):
     tke_profile = 0.5 * (u_prime2 + v_prime2 + w_prime2)
 
     tke = np.trapezoid(tke_profile, y)
+
+    return tke * 1000  # Scale the TKE value for better numerical stability
+
+def compute_scaled_exergy(variances, action_np, gamma=1.0, verbose=True):
+
+    scaled_tke = compute_scaled_tke(variances, verbose)
+    blowing_cost = np.mean(np.abs(action_np))
+    reward = scaled_tke - gamma * blowing_cost
     
-    return tke
+    return reward
 
 def parse_input(filename, verbose=True):
     if verbose:
@@ -56,6 +66,17 @@ def parse_input(filename, verbose=True):
         velocity_field[0, :, :, z] = means[1][z]
     velocity_field[2, :, :, model.ng[2]-1] = means[3][model.ng[2]-1]
     return velocity_field
+
+def compute_tke_ref(filename, verbose=True):
+    # Compute the reference TKE from the input velocity field.
+    # UNUSED
+    if verbose:
+        print(f"Computing reference TKE from {filename}...")
+        
+    data = np.loadtxt(filename)
+    res = np.array([data[:, 0], data[:, 4], data[:, 5], data[:, 6]])
+    tke_ref = compute_scaled_tke(res, verbose)
+    return tke_ref
 
 def create_grids_input(foldername, wall_blowing_amps, verbose=True):
     if verbose:
@@ -126,16 +147,16 @@ def criterion_tke_grids(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the grids predicted by the rl agent, launch the simulation, parse the results, and compute the TKE.
     create_grids_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
-    res = parse_results(jobid, verbose)
-    return compute_tke(res, verbose)
+    variances = parse_results(jobid, verbose)
+    return compute_scaled_tke(variances, verbose)
 
 
 def criterion_tke_single_grid(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute the TKE.
     create_single_grid_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
-    res = parse_results(jobid, verbose)
-    return compute_tke(res, verbose)
+    variances = parse_results(jobid, verbose)
+    return compute_scaled_exergy(variances, train_preds, verbose=verbose)
 
 def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler, verbose=True):
     # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
@@ -153,24 +174,27 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         action_mean = agent(input_velocity_tensor, input_time_tensor)
         distribution = torch.distributions.Normal(action_mean, exploration_noise)
         action_sample = distribution.sample()
-        log_prob = distribution.log_prob(action_sample).sum()
+        log_prob = distribution.log_prob(action_sample).mean()
         action_np = action_sample.cpu().numpy()
         action_np = np.clip(action_np, -1.0, 1.0)
         train_foldername = f"training_inputs/training_input_epoch{epoch + 1}"
         reward = criterion(train_foldername, action_np, verbose)
         loss = -log_prob * reward
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=1.0)
         optimizer.step()
         train_loss = loss.item()
 
         #scheduler.step(valid_loss) 
         current_lr = optimizer.param_groups[0]['lr']
 
-        print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.6f}\n\ttrain_loss : {train_loss:>9.3f} - reward : {reward:>9.3f}\n")
+        print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.6f}\n\ttrain_loss : {train_loss:>9.3f} - reward : {reward:>9.6f}\n")
 
 def init_train(filename, nb_epoch, verbose=True):
     # Initialize the training process by parsing the input velocity field, setting up the device (GPU or CPU), creating the model, optimizer, criterion, and scheduler, and then calling the train function.
     train_velocity_field = parse_input(filename, verbose)
+    # global TKE_ref
+    # TKE_ref = compute_tke_ref(filename, verbose)
     time_steps = torch.linspace(0.0, 1.0, model.nb_snapshots).unsqueeze(1)
 
     if torch.cuda.is_available():

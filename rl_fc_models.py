@@ -223,6 +223,7 @@ class FlowControlCoeffSingleGrid(nn.Module): # Fourier series coefficients, 1 gr
 
         a = self.final(v)
         c = a[0]
+        print(f"Coefficients: {c.detach().cpu().numpy()}")
         w = torch.zeros((control_width, control_length), device=c.device)
 
         for i in range(nb_coeffs):
