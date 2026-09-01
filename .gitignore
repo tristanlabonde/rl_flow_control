@@ -6,5 +6,7 @@ __pycache__
 *.xmf
 training_inputs
 wall_blowing_input
+INFO_VISU.md
+INFO_INPUT.md
 # Too heavy
-data
+data/
