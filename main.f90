@@ -814,7 +814,9 @@ program cans
       !$acc update self(st3)
       include 'out2d.h90'
     end if
-    if(iout3d > 0.and.mod(istep,max(iout3d,1)) == 0) then
+! adding '.or. istep == 1', one 3d image at step 1 (tristan labonde)
+    if(iout3d > 0.and.(mod(istep,max(iout3d,1)) == 0 .or. istep == 1)) then
+!
       !$acc wait
       !$acc update self(u,v,w,p)
       do iscal=1,nscal

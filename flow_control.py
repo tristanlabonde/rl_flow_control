@@ -33,23 +33,23 @@ def compute_scaled_tke(variances, verbose=True):
     if variances is None:
         if verbose:
             print("\033[31mInvalid results detected.\033[0m")
-        return -1  # Return a low reward if results are invalid
+        return -5  # Return a low reward if results are invalid
     
-    y = variances[0]
+    z = variances[0]
     u_prime2 = variances[1]
     v_prime2 = variances[2]
     w_prime2 = variances[3]
 
     tke_profile = 0.5 * (u_prime2 + v_prime2 + w_prime2)
 
-    tke = np.trapezoid(tke_profile, y)
+    tke = np.trapezoid(tke_profile, z)
 
     return tke * 1000  # Scale the TKE value for better numerical stability
 
-def compute_scaled_exergy(variances, action_np, gamma=1.0, verbose=True):
+def compute_scaled_exergy(variances, action_np, gamma=0.3, verbose=True):
 
     scaled_tke = compute_scaled_tke(variances, verbose)
-    blowing_cost = np.mean(np.abs(action_np))
+    blowing_cost = np.mean(np.square(action_np))
     reward = scaled_tke - gamma * blowing_cost
     
     return reward
@@ -211,7 +211,7 @@ def init_train(filename, nb_epoch, verbose=True):
     input_time_tensor = time_steps.to(device)
     agent = model.FlowControlCoeffSingleGrid().to(device)
 
-    optimizer = torch.optim.Adam(agent.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-6, weight_decay=1e-4)
     criterion = criterion_tke_single_grid
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.5,patience=2)
 
