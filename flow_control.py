@@ -2,11 +2,13 @@ import subprocess
 import numpy as np
 import torch
 import time
+import glob
 import os
 import rl_fc_models as model
 from collections import deque
 
 TKE_ref = 0
+GAMMA = 0.3
 
 def parse_results(jobid, verbose=True): #results are stored in data/
     # Read the results of the simulation from the output file stats1d.out and return a 4 x height array where row 0 is the height, row 1 is the u-velocity variance, row 2 is the v-velocity variance and row 3 is the w-velocity variance.
@@ -46,11 +48,48 @@ def compute_scaled_tke(variances, verbose=True):
 
     return tke * 1000  # Scale the TKE value for better numerical stability
 
-def compute_scaled_exergy(variances, action_np, gamma=0.3, verbose=True):
+def compute_scaled_exergy_tke(variances, action_np, gamma=GAMMA, verbose=True):
 
     scaled_tke = compute_scaled_tke(variances, verbose)
     blowing_cost = np.mean(np.square(action_np))
     reward = scaled_tke - gamma * blowing_cost
+    
+    return reward
+
+def compute_nusselt(file_temp, z0, z1):
+    print(f"z0: {z0}, z1: {z1}")
+    
+    try:
+        t_data = np.fromfile(file_temp, dtype=np.float64)
+        t = np.reshape(t_data, (model.ng[0], model.ng[1], model.ng[2]), order='F')
+    except FileNotFoundError:
+        return None
+    
+    t_mean_z = np.mean(t, axis=(0, 1))
+
+    Nu_wall = (t_mean_z[1] - t_mean_z[0]) / (z1 -z0)
+    
+    return Nu_wall
+
+def compute_exergy_nusselt(z, action_np, gamma=GAMMA, verbose=True):
+    file_temp = sorted(glob.glob("tmp_data/sca_001_fld_*.bin"))[-3:]
+    nu_list = []
+
+    if verbose:
+        print(f"Computing Nusselt number for files: {file_temp}")
+
+    for file in file_temp:
+        nu_val = compute_nusselt(file, z[0], z[1])
+        if nu_val is not None and not np.isnan(nu_val):
+            nu_list.append(nu_val)
+
+    if len(nu_list) == len(file_temp):
+        Nu_mean = np.mean(nu_list)
+    else:
+        Nu_mean = -5.0
+
+    blowing_cost = np.mean(np.square(action_np))
+    reward = Nu_mean - gamma * blowing_cost
     
     return reward
 
@@ -156,7 +195,14 @@ def criterion_tke_single_grid(train_foldername, train_preds, verbose=True):
     create_single_grid_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
     variances = parse_results(jobid, verbose)
-    return compute_scaled_exergy(variances, train_preds, verbose=verbose)
+    return compute_scaled_exergy_tke(variances, train_preds, verbose=verbose)
+
+def criterion_nusselt_single_grid(train_foldername, train_preds, verbose=True):
+    # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute the Nusselt number.
+    create_single_grid_input(train_foldername, train_preds, verbose)
+    jobid = launch_simulation(verbose)
+    variances = parse_results(jobid, verbose)
+    return compute_exergy_nusselt(variances[0], train_preds, verbose=verbose)
 
 def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler, verbose=True):
     # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
