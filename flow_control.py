@@ -4,6 +4,7 @@ import torch
 import time
 import glob
 import os
+import re
 import rl_fc_models as model
 from collections import deque
 
@@ -56,42 +57,80 @@ def compute_scaled_exergy_tke(variances, action_np, gamma=GAMMA, verbose=True):
     
     return reward
 
-def compute_nusselt(file_temp, z0, z1):
+def compute_nusselt(file_temp, z0, z1, verbose=True):
     print(f"z0: {z0}, z1: {z1}")
-    
-    try:
-        t_data = np.fromfile(file_temp, dtype=np.float64)
-        t = np.reshape(t_data, (model.ng[0], model.ng[1], model.ng[2]), order='F')
-    except FileNotFoundError:
-        return None
-    
-    t_mean_z = np.mean(t, axis=(0, 1))
 
-    Nu_wall = (t_mean_z[1] - t_mean_z[0]) / (z1 -z0)
-    
-    return Nu_wall
-
-def compute_exergy_nusselt(z, action_np, gamma=GAMMA, verbose=True):
-    file_temp = sorted(glob.glob("tmp_data/sca_001_fld_*.bin"))[-3:]
     nu_list = []
 
     if verbose:
         print(f"Computing Nusselt number for files: {file_temp}")
 
     for file in file_temp:
-        nu_val = compute_nusselt(file, z[0], z[1])
-        if nu_val is not None and not np.isnan(nu_val):
-            nu_list.append(nu_val)
+        try:
+            t_data = np.fromfile(file, dtype=np.float64)
+            t = np.reshape(t_data, (model.ng[0], model.ng[1], model.ng[2]), order='F')
+        except FileNotFoundError:
+            if verbose:
+                print(f"\033[31mFile {file} not found. Skipping this file.\033[0m")
+            continue
+
+        t = t[model.starting_x+model.control_width*model.cutting_rate+1:, :, 0:2] # Extract the temperature data for the specified x-range and first two z-planes
+        t_mean_z = np.mean(t, axis=(0, 1))
+
+        nu_wall = (t_mean_z[1] - t_mean_z[0]) / (z1 - z0)
+
+        if nu_wall is not np.isnan(nu_wall):
+            nu_list.append(nu_wall)
 
     if len(nu_list) == len(file_temp):
-        Nu_mean = np.mean(nu_list)
+        return np.mean(nu_list)
     else:
-        Nu_mean = -5.0
+        return -5.0
+
+def compute_exergy_nusselt(z, action_np, gamma=GAMMA, nb_files=3, verbose=True):
+    file_temp = sorted(glob.glob("data/sca_001_fld_*.bin"))[-nb_files:]
+
+    Nu_mean = compute_nusselt(file_temp, z[0], z[1])
 
     blowing_cost = np.mean(np.square(action_np))
     reward = Nu_mean - gamma * blowing_cost
     
     return reward
+
+def compute_thermic_capacity(nb_files, verbose=True):
+
+    log_visu_3d = np.loadtxt("data/log_visu_3d.out")
+    geometry = np.loadtxt("data/geometry.out")
+
+    Lx = geometry[1, 0]
+    Ly = geometry[1, 1]
+    Lz = geometry[1, 2]
+    Lx_region = ((model.ng[0] - (model.starting_x+model.control_width*model.cutting_rate+1))/model.ng[0]) * Lx
+    S = Lx_region * Ly
+    nb_parameters = 9 # Number of parameters in the simulation (u, v, w, T, p, etc.)
+    delta_t = log_visu_3d[-nb_parameters, -2] - log_visu_3d[-nb_files*nb_parameters, -2]
+
+    print(f"file numbers for delta_t computation : {log_visu_3d[-nb_parameters, -1]} - {log_visu_3d[-nb_files*nb_parameters, -1]}")
+
+    with open("input.nml", 'r', encoding='utf-8') as f:
+        content = f.read()
+    alphai_pattern = r"alphai(:)\s*=\s*([-+]?\d*\.?\d+)"
+    k = 1.0/float((re.search(alphai_pattern, content)).group(1))
+
+    delta_T = 1.0
+
+    return ((k*delta_T)/Lz)*S*delta_t
+
+def compute_thermal_efficiency(z, action_np, nb_files=3, verbose=True):
+    file_temp = sorted(glob.glob("data/sca_001_fld_*.bin"))[-nb_files:]
+
+    Nu_mean = compute_nusselt(file_temp, z[0], z[1])
+    Cth = compute_thermic_capacity(nb_files, verbose)
+    E_out = Cth * Nu_mean
+
+    E_in = np.mean(np.square(action_np)) # a changer pour passer a la véritable énergie d'entrée, cad la puissance de soufflage multipliée par le temps de simulation plus l'énergie de pompage du canal
+
+    return (E_out / E_in) * 100
 
 def parse_input(filename, verbose=True):
     if verbose:
