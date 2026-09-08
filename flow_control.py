@@ -128,7 +128,11 @@ def compute_thermal_efficiency(z, action_np, nb_files=3, verbose=True):
     Cth = compute_thermic_capacity(nb_files, verbose)
     E_out = Cth * Nu_mean
 
-    E_in = np.mean(np.square(action_np)) # a changer pour passer a la véritable énergie d'entrée, cad la puissance de soufflage multipliée par le temps de simulation plus l'énergie de pompage du canal
+    E_base_pump = 10.0    # Base pumping energy of the channel over delta_t = 75
+    E_max_blow   = 0.1     # Energy consumed by ONE jet at 80% U_ref (action = 1.0)
+
+    E_jets = E_max_blow * np.sum(np.abs(action_np)**3)
+    E_in = E_base_pump + E_jets
 
     return (E_out / E_in) * 100
 
@@ -230,18 +234,25 @@ def criterion_tke_grids(train_foldername, train_preds, verbose=True):
 
 
 def criterion_tke_single_grid(train_foldername, train_preds, verbose=True):
-    # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute the TKE.
+    # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute exergy based on TKE.
     create_single_grid_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
     variances = parse_results(jobid, verbose)
     return compute_scaled_exergy_tke(variances, train_preds, verbose=verbose)
 
 def criterion_nusselt_single_grid(train_foldername, train_preds, verbose=True):
-    # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute the Nusselt number.
+    # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute exergy based on Nusselt number.
     create_single_grid_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
     variances = parse_results(jobid, verbose)
     return compute_exergy_nusselt(variances[0], train_preds, verbose=verbose)
+
+def criterion_thermal_efficiency_single_grid(train_foldername, train_preds, verbose=True):
+    # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute thermal efficiency.
+    create_single_grid_input(train_foldername, train_preds, verbose)
+    jobid = launch_simulation(verbose)
+    variances = parse_results(jobid, verbose)
+    return compute_thermal_efficiency(variances[0], train_preds, nb_files=3, verbose=True)
 
 def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler, verbose=True):
     # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
@@ -297,7 +308,7 @@ def init_train(filename, nb_epoch, verbose=True):
     agent = model.FlowControlCoeffSingleGrid().to(device)
 
     optimizer = torch.optim.Adam(agent.parameters(), lr=1e-6, weight_decay=1e-4)
-    criterion = criterion_tke_single_grid
+    criterion = criterion_thermal_efficiency_single_grid
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.5,patience=2)
 
     start = time.time()
