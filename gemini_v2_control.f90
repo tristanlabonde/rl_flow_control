@@ -14,8 +14,6 @@ subroutine apply_wall_blowing(istep, time, w)
   real(rp), intent(in) :: time
   real(rp), intent(inout) :: w(0:,0:,0:)
 
-  real(rp), parameter :: max_blow = 0.8_rp
-
   integer :: file_unit, io_status, read_status, f_x, f_y, gx, gy
   real(rp) :: f_amp
   integer :: nx_max, ny_max, i, j
@@ -39,7 +37,7 @@ subroutine apply_wall_blowing(istep, time, w)
         gx = f_x + 1
         gy = f_y + 1
         if (gx <= nx_max .and. gy <= ny_max) then
-          blow_profile(gx, gy) = max_blow * f_amp
+          blow_profile(gx, gy) = f_amp
         end if
       end do
       close(file_unit)

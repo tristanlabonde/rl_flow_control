@@ -5,11 +5,9 @@ import time
 import glob
 import os
 import re
-import rl_fc_models as model
 from collections import deque
-
-TKE_ref = 0
-GAMMA = 0.3
+import rl_fc_models as models
+import hyperparameters as hp
 
 def parse_results(jobid, verbose=True): #results are stored in data/
     # Read the results of the simulation from the output file stats1d.out and return a 4 x height array where row 0 is the height, row 1 is the u-velocity variance, row 2 is the v-velocity variance and row 3 is the w-velocity variance.
@@ -49,7 +47,7 @@ def compute_scaled_tke(variances, verbose=True):
 
     return tke * 1000  # Scale the TKE value for better numerical stability
 
-def compute_scaled_exergy_tke(variances, action_np, gamma=GAMMA, verbose=True):
+def compute_scaled_exergy_tke(variances, action_np, gamma=hp.gamma, verbose=True):
 
     scaled_tke = compute_scaled_tke(variances, verbose)
     blowing_cost = np.mean(np.square(action_np))
@@ -67,13 +65,13 @@ def compute_nusselt(file_temp, z0, z1, verbose=True):
     for file in file_temp:
         try:
             t_data = np.fromfile(file, dtype=np.float64)
-            t = np.reshape(t_data, (model.ng[0], model.ng[1], model.ng[2]), order='F')
+            t = np.reshape(t_data, (hp.ng[0], hp.ng[1], hp.ng[2]), order='F')
         except FileNotFoundError:
             if verbose:
                 print(f"\033[31mFile {file} not found. Skipping this file.\033[0m")
             continue
 
-        t = t[model.starting_x+model.control_width*model.cutting_rate+1:, :, 0:2] # Extract the temperature data for the specified x-range and first two z-planes
+        t = t[hp.starting_x+hp.control_width*hp.cutting_rate+1:, :, 0:2] # Extract the temperature data for the specified x-range and first two z-planes
         t_mean_z = np.mean(t, axis=(0, 1))
 
         nu_wall = (t_mean_z[1] - t_mean_z[0]) / (z1 - z0)
@@ -86,7 +84,7 @@ def compute_nusselt(file_temp, z0, z1, verbose=True):
     else:
         return -5.0
 
-def compute_exergy_nusselt(z, action_np, gamma=GAMMA, nb_files=3, verbose=True):
+def compute_exergy_nusselt(z, action_np, gamma=hp.gamma, nb_files=3, verbose=True):
     file_temp = sorted(glob.glob("data/sca_001_fld_*.bin"))[-nb_files:]
 
     Nu_mean = compute_nusselt(file_temp, z[0], z[1])
@@ -104,7 +102,7 @@ def compute_thermic_capacity(nb_files, verbose=True):
     Lx = geometry[1, 0]
     Ly = geometry[1, 1]
     Lz = geometry[1, 2]
-    Lx_region = ((model.ng[0] - (model.starting_x+model.control_width*model.cutting_rate+1))/model.ng[0]) * Lx
+    Lx_region = ((hp.ng[0] - (hp.starting_x+hp.control_width*hp.cutting_rate+1))/hp.ng[0]) * Lx
     S = Lx_region * Ly
     nb_parameters = 9 # Number of parameters in the simulation (u, v, w, T, p, etc.)
     delta_t = float(log_visu_3d[-nb_parameters, -2]) - float(log_visu_3d[-nb_files*nb_parameters, -2])
@@ -118,7 +116,7 @@ def compute_thermic_capacity(nb_files, verbose=True):
 
     return ((k*delta_T)/Lz)*S*delta_t
 
-def compute_thermal_efficiency(z, action_np, nb_files=3, verbose=True):
+def compute_thermal_efficiency(z, action_np, nb_files=4, verbose=True):
     file_temp = sorted(glob.glob("data/sca_001_fld_*.bin"))[-nb_files:]
 
     Nu_mean = compute_nusselt(file_temp, z[0], z[1])
@@ -131,7 +129,7 @@ def compute_thermal_efficiency(z, action_np, nb_files=3, verbose=True):
     E_jets = E_max_blow * np.sum(np.abs(action_np)**3)
     E_in = E_base_pump + E_jets
 
-    return ((E_out / E_in) * 100)
+    return E_out / E_in
 
 def parse_input(filename, verbose=True):
     if verbose:
@@ -140,10 +138,10 @@ def parse_input(filename, verbose=True):
     data = np.loadtxt(filename)
     means = np.array([data[:, 0], data[:, 1], data[:, 2], data[:, 3]]) # position z, means of u, v, w on the x-y corresponding planes
 
-    velocity_field = np.zeros((model.nb_components, model.ng[0], model.ng[1], model.ng[2]))
-    for z in range(model.ng[2]):
+    velocity_field = np.zeros((hp.nb_components, hp.ng[0], hp.ng[1], hp.ng[2]))
+    for z in range(hp.ng[2]):
         velocity_field[0, :, :, z] = means[1][z]
-    velocity_field[2, :, :, model.ng[2]-1] = means[3][model.ng[2]-1]
+    velocity_field[2, :, :, hp.ng[2]-1] = means[3][hp.ng[2]-1]
     return velocity_field
 
 def compute_tke_ref(filename, verbose=True):
@@ -160,15 +158,15 @@ def compute_tke_ref(filename, verbose=True):
 def create_grids_input(foldername, wall_blowing_amps, verbose=True):
     if verbose:
         print(f"\tCreating input folder {foldername}")
-    for t in range(model.nb_snapshots):
+    for t in range(hp.nb_snapshots):
         filename = foldername+"/grids_input"+str(t)+".txt"
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'w') as f:
-            for x in range(model.control_width):
-                for y in range(model.control_length):
-                    for i in range(model.cutting_rate):
-                        for j in range(model.cutting_rate):
-                            f.write(f"{model.starting_x + x*model.cutting_rate + i} {y*model.cutting_rate + j} {wall_blowing_amps[t, x, y]}\n")
+            for x in range(hp.control_width):
+                for y in range(hp.control_length):
+                    for i in range(hp.cutting_rate):
+                        for j in range(hp.cutting_rate):
+                            f.write(f"{hp.starting_x + x*hp.cutting_rate + i} {y*hp.cutting_rate + j} {wall_blowing_amps[t, x, y]}\n")
             f.close()
 
     simulation_input = "./wall_blowing_input"
@@ -183,11 +181,11 @@ def create_single_grid_input(foldername, wall_blowing_amps, verbose=True):
     filename = foldername+"/single_grid_input.txt"
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, 'w') as f:
-        for x in range(model.control_width):
-            for y in range(model.control_length):
-                for i in range(model.cutting_rate):
-                    for j in range(model.cutting_rate):
-                        f.write(f"{model.starting_x + x*model.cutting_rate + i} {y*model.cutting_rate + j} {wall_blowing_amps[x, y]}\n")
+        for x in range(hp.control_width):
+            for y in range(hp.control_length):
+                for i in range(hp.cutting_rate):
+                    for j in range(hp.cutting_rate):
+                        f.write(f"{hp.starting_x + x*hp.cutting_rate + i} {y*hp.cutting_rate + j} {wall_blowing_amps[x, y]}\n")
         f.close()
 
     simulation_input = "./wall_blowing_input"
@@ -224,6 +222,7 @@ def launch_simulation(verbose=True):
 
 def criterion_tke_grids(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the grids predicted by the rl agent, launch the simulation, parse the results, and compute the TKE.
+    train_preds = train_preds * hp.max_blow
     create_grids_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
     variances = parse_results(jobid, verbose)
@@ -255,7 +254,7 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
     # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
     print("Training starts...\n")
 
-    exploration_noise = 0.05
+    exploration_noise = 0.01
     running_reward_mean = None
 
     for epoch in range(nb_epoch):
@@ -290,14 +289,14 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         #scheduler.step(valid_loss) 
         current_lr = optimizer.param_groups[0]['lr']
 
-        print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.6f}\n\ttrain_loss : {train_loss:>9.3f} - reward : {reward:>9.6f}\n")
+        print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.6f}\n\ttrain_loss : {train_loss:>9.3f} - reward : {reward:>9.6f} - advantage : {advantage:>9.6f}\n")
 
 def init_train(filename, nb_epoch, verbose=True):
     # Initialize the training process by parsing the input velocity field, setting up the device (GPU or CPU), creating the model, optimizer, criterion, and scheduler, and then calling the train function.
     train_velocity_field = parse_input(filename, verbose)
-    # global TKE_ref
-    # TKE_ref = compute_tke_ref(filename, verbose)
-    time_steps = torch.linspace(0.0, 1.0, model.nb_snapshots).unsqueeze(1)
+    # hp.tke_ref
+    # hp.tke_ref = compute_tke_ref(filename, verbose)
+    time_steps = torch.linspace(0.0, 1.0, hp.nb_snapshots).unsqueeze(1)
 
     if torch.cuda.is_available():
         print(f"GPU found : {torch.cuda.get_device_name(0)}")
@@ -311,9 +310,9 @@ def init_train(filename, nb_epoch, verbose=True):
 
     input_velocity_tensor = torch.from_numpy(np.array([train_velocity_field])).float().to(device)
     input_time_tensor = time_steps.to(device)
-    agent = model.FlowControlCoeffSingleGrid().to(device)
+    agent = models.FlowControlCoeffSingleGrid().to(device)
 
-    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-6, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-7, weight_decay=1e-4)
     criterion = criterion_thermal_efficiency_single_grid
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.5,patience=2)
 
