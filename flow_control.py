@@ -58,12 +58,11 @@ def compute_scaled_exergy_tke(variances, action_np, gamma=GAMMA, verbose=True):
     return reward
 
 def compute_nusselt(file_temp, z0, z1, verbose=True):
-    print(f"z0: {z0}, z1: {z1}")
 
     nu_list = []
 
     if verbose:
-        print(f"Computing Nusselt number for files: {file_temp}")
+        print(f"\tComputing Nusselt number for files: {file_temp}")
 
     for file in file_temp:
         try:
@@ -99,7 +98,7 @@ def compute_exergy_nusselt(z, action_np, gamma=GAMMA, nb_files=3, verbose=True):
 
 def compute_thermic_capacity(nb_files, verbose=True):
 
-    log_visu_3d = np.loadtxt("data/log_visu_3d.out")
+    log_visu_3d = np.loadtxt("data/log_visu_3d.out", dtype=str)
     geometry = np.loadtxt("data/geometry.out")
 
     Lx = geometry[1, 0]
@@ -108,13 +107,11 @@ def compute_thermic_capacity(nb_files, verbose=True):
     Lx_region = ((model.ng[0] - (model.starting_x+model.control_width*model.cutting_rate+1))/model.ng[0]) * Lx
     S = Lx_region * Ly
     nb_parameters = 9 # Number of parameters in the simulation (u, v, w, T, p, etc.)
-    delta_t = log_visu_3d[-nb_parameters, -2] - log_visu_3d[-nb_files*nb_parameters, -2]
-
-    print(f"file numbers for delta_t computation : {log_visu_3d[-nb_parameters, -1]} - {log_visu_3d[-nb_files*nb_parameters, -1]}")
+    delta_t = float(log_visu_3d[-nb_parameters, -2]) - float(log_visu_3d[-nb_files*nb_parameters, -2])
 
     with open("input.nml", 'r', encoding='utf-8') as f:
         content = f.read()
-    alphai_pattern = r"alphai(:)\s*=\s*([-+]?\d*\.?\d+)"
+    alphai_pattern = r"alphai\(\:\)\s*=\s*([-+]?\d*\.?\d*)"
     k = 1.0/float((re.search(alphai_pattern, content)).group(1))
 
     delta_T = 1.0
@@ -134,7 +131,7 @@ def compute_thermal_efficiency(z, action_np, nb_files=3, verbose=True):
     E_jets = E_max_blow * np.sum(np.abs(action_np)**3)
     E_in = E_base_pump + E_jets
 
-    return (E_out / E_in) * 100
+    return ((E_out / E_in) * 100)
 
 def parse_input(filename, verbose=True):
     if verbose:
@@ -258,7 +255,8 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
     # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
     print("Training starts...\n")
 
-    exploration_noise = 0.01
+    exploration_noise = 0.05
+    running_reward_mean = None
 
     for epoch in range(nb_epoch):
         if verbose:
@@ -275,7 +273,15 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         action_np = np.clip(action_np, -1.0, 1.0)
         train_foldername = f"training_inputs/training_input_epoch{epoch + 1}"
         reward = criterion(train_foldername, action_np, verbose)
-        loss = -log_prob * reward
+
+        if running_reward_mean is None:
+            running_reward_mean = reward
+        else:
+            running_reward_mean = running_reward_mean + reward
+
+        advantage = reward - (running_reward_mean / (epoch + 1))
+        loss = -log_prob * advantage
+
         loss.backward()
         torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=1.0)
         optimizer.step()
