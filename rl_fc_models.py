@@ -128,8 +128,7 @@ class FlowControlCoeffGrids(nn.Module): # Fourier series coefficients, 1 grid pe
         )
 
         self.final = nn.Sequential(
-            nn.Linear(hp.ng[0]*hp.ng[1]*hp.ng[2]//(1024*hp.cutting_rate) + 16, hp.nb_coeffs),
-            nn.Tanh()
+            nn.Linear(hp.ng[0]*hp.ng[1]*hp.ng[2]//(1024*hp.cutting_rate) + 16, hp.nb_coeffs)
         )
 
         x_grid = hp.starting_x + torch.arange(0, hp.control_width, dtype=torch.float32)*hp.cutting_rate
@@ -192,8 +191,7 @@ class FlowControlCoeffSingleGrid(nn.Module): # Fourier series coefficients, 1 gr
         )
 
         self.final = nn.Sequential(
-            nn.Linear(hp.ng[0]*hp.ng[1]*hp.ng[2]//(1024*hp.cutting_rate), hp.nb_coeffs),
-            nn.Tanh()
+            nn.Linear(hp.ng[0]*hp.ng[1]*hp.ng[2]//(1024*hp.cutting_rate), hp.nb_coeffs)
         )
 
         x_grid = hp.starting_x + torch.arange(0, hp.control_width, dtype=torch.float32)*hp.cutting_rate
@@ -212,12 +210,15 @@ class FlowControlCoeffSingleGrid(nn.Module): # Fourier series coefficients, 1 gr
         v = self.reduce(v)
 
         a = self.final(v)
-        c = a[0]
-        print(f"Coefficients: {c.detach().cpu().numpy()}")
-        w = torch.zeros((hp.control_width, hp.control_length), device=c.device)
+        print(f"Coefficients: {a[0].detach().cpu().numpy()}")
+
+        return a
+    
+    def generate_grid(self, coeffs):
+        w = torch.zeros((hp.control_width, hp.control_length), device=coeffs.device)
 
         for i in range(hp.nb_coeffs):
-            w += c[i] * self.sin_x[i].unsqueeze(1) * self.sin_y[i].unsqueeze(0)
+            w += coeffs[i] * self.sin_x[i].unsqueeze(1) * self.sin_y[i].unsqueeze(0)
         
         return w
     

@@ -3,14 +3,20 @@ nb_components = 3 # velocity u, velocity v, velocity w
 ng = [512, 128, 160] # dimensions of the velocity field
 starting_x = 100
 cutting_rate = 1
-control_width = 64//cutting_rate
+nb_width_points = 64
+control_width = nb_width_points//cutting_rate
 control_length = ng[1]//cutting_rate
 nb_actions = control_width * control_length
 
-nb_coeffs = 4 # number of Fourier series coefficients to predict
-
+starting_coeff = 2
+nb_coeffs = 4
 tke_ref = 0
 gamma = 0.3
 nb_epoch = 50
+starting_blow = 0.4
 max_blow = 0.8
 blowstep = 0.1
+alpha = 0.15
+Nu_baseline = 2.962 # calculated and rounded from 2.9619621858466085 obtained from the baseline simulation with no control
+blow_area_rate = nb_width_points / ng[0]
+learning_rate = 1e-6

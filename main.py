@@ -14,19 +14,14 @@ def main():
     else:
         nb_epoch = hp.nb_epoch
 
-    max_blow = hp.max_blow
     nb_coeffs = hp.nb_coeffs
-    max_blow_range = int(max_blow/hp.blowstep)
-    for blow in range(3, max_blow_range + 1):
-        blow = round(blow * hp.blowstep, 2)
-        for nb in range(1, nb_coeffs + 1):
-            if os.path.exists("./jobs"):
-                for item in glob.glob("./jobs/*"):
-                    os.remove(item)        
-            hp.nb_coeffs = nb
-            hp.max_blow = blow
-            print(f"Training with max_blow = {blow}, nb_coeffs = {nb}")
-            flow_control.init_train(filename, nb_epoch, verbose)
+    for nb in range(hp.starting_coeff, nb_coeffs + 1):
+        if os.path.exists("./jobs"):
+            for item in glob.glob("./jobs/*"):
+                os.remove(item)
+        hp.nb_coeffs = nb
+        print(f"Training with nb_coeffs = {nb}")
+        flow_control.init_train(filename, nb_epoch, verbose)
 
 
 if __name__ == "__main__":

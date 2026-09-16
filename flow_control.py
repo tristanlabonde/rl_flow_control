@@ -72,10 +72,17 @@ def compute_nusselt(file_temp, z0, z1, verbose=True):
             continue
 
         t = t[hp.starting_x+hp.control_width*hp.cutting_rate+1:, :, 0:2] # Extract the temperature data for the specified x-range and first two z-planes
-        t_mean_z = np.mean(t, axis=(0, 1))
+        # with open('./saved_std/temperature_z1.txt', 'a', encoding='utf-8') as f:
+            # f.write("Values of temperature on z1 plane for file " + file + ": \n\n")
+            # f.write(str(t[1]))
 
+        t_mean_z = np.mean(t, axis=(0,1))
         nu_wall = (t_mean_z[1] - t_mean_z[0]) / (z1 - z0)
 
+            # f.write("\n\nMean z1, z0: ")
+            # f.write(str(t_mean_z[1]) + " " + str(t_mean_z[0]))
+            # f.write("\n\n")
+        
         if nu_wall is not np.isnan(nu_wall):
             nu_list.append(nu_wall)
 
@@ -84,7 +91,7 @@ def compute_nusselt(file_temp, z0, z1, verbose=True):
     else:
         return -5.0
 
-def compute_exergy_nusselt(z, action_np, gamma=hp.gamma, nb_files=3, verbose=True):
+def compute_exergy_nusselt(z, action_np, gamma=hp.gamma, nb_files=4, verbose=True):
     file_temp = sorted(glob.glob("data/sca_001_fld_*.bin"))[-nb_files:]
 
     Nu_mean = compute_nusselt(file_temp, z[0], z[1])
@@ -120,16 +127,31 @@ def compute_thermal_efficiency(z, action_np, nb_files=4, verbose=True):
     file_temp = sorted(glob.glob("data/sca_001_fld_*.bin"))[-nb_files:]
 
     Nu_mean = compute_nusselt(file_temp, z[0], z[1])
+    if verbose:
+        print(f"\tNusselt mean: {Nu_mean}")
+
     Cth = compute_thermic_capacity(nb_files, verbose)
+    if verbose:
+        print(f"\tThermic capacity: {Cth}")
+
     E_out = Cth * Nu_mean
+    if verbose:
+        print(f"\tE_out: {E_out}")
+
+    E_out_absolute = Cth * (Nu_mean - hp.Nu_baseline)
 
     E_base_pump = 10.0    # Base pumping energy of the channel over delta_t = 75
-    E_max_blow   = 0.1     # Energy consumed by ONE jet at 80% U_ref (action = 1.0)
 
-    E_jets = E_max_blow * np.sum(np.abs(action_np)**3)
-    E_in = E_base_pump + E_jets
+    amp_blow = np.abs(action_np)
+    E_blow = 0.5 * hp.blow_area_rate * np.mean(amp_blow**3)
+    if verbose:
+        print(f"\tE_blow: {E_blow}")
+        
+    E_in = E_base_pump + E_blow
+    if verbose:
+        print(f"\tE_in: {E_in}")
 
-    return E_out / E_in
+    return (E_out / E_in)
 
 def parse_input(filename, verbose=True):
     if verbose:
@@ -197,11 +219,7 @@ def create_single_grid_input(foldername, wall_blowing_amps, verbose=True):
 def launch_simulation(verbose=True):
     # Launch the simulation using the command sbatch --wait srun.sh.
     command = ["sbatch", "--wait", "srun.sh"]
-    reset_command = ["rm", "-rf", "data/*"]
 
-    if verbose:
-        print("\tCleaning previous results...")
-    subprocess.run(reset_command, check=True)
     try:
         if verbose:
             print("\tLaunching simulation...")
@@ -222,7 +240,6 @@ def launch_simulation(verbose=True):
 
 def criterion_tke_grids(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the grids predicted by the rl agent, launch the simulation, parse the results, and compute the TKE.
-    train_preds = train_preds * hp.max_blow
     create_grids_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
     variances = parse_results(jobid, verbose)
@@ -245,10 +262,11 @@ def criterion_nusselt_single_grid(train_foldername, train_preds, verbose=True):
 
 def criterion_thermal_efficiency_single_grid(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute thermal efficiency.
+    train_preds = train_preds * hp.max_blow
     create_single_grid_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
     variances = parse_results(jobid, verbose)
-    return compute_thermal_efficiency(variances[0], train_preds, nb_files=3, verbose=True)
+    return compute_thermal_efficiency(variances[0], train_preds, verbose=True)
 
 def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler, verbose=True):
     # Train the RL agent for a specified number of epochs, using the provided optimizer, criterion, and scheduler.
@@ -264,21 +282,23 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
 
         agent.train()
         optimizer.zero_grad()
-        action_mean = agent(input_velocity_tensor, input_time_tensor)
-        distribution = torch.distributions.Normal(action_mean, exploration_noise)
-        action_sample = distribution.sample()
-        log_prob = distribution.log_prob(action_sample).mean()
-        action_np = action_sample.cpu().numpy()
+        action_coeffs_mean = agent(input_velocity_tensor, input_time_tensor)
+        distribution = torch.distributions.Normal(action_coeffs_mean, exploration_noise)
+        coeffs_sample = distribution.sample()
+        log_prob = distribution.log_prob(coeffs_sample).sum()
+        w_tensor = agent.generate_grid(coeffs_sample[0])
+        action_np = w_tensor.detach().cpu().numpy()
         action_np = np.clip(action_np, -1.0, 1.0)
         train_foldername = f"training_inputs/training_input_epoch{epoch + 1}"
         reward = criterion(train_foldername, action_np, verbose)
 
+        # EMA (moyenne glissante)
         if running_reward_mean is None:
             running_reward_mean = reward
         else:
-            running_reward_mean = running_reward_mean + reward
+            running_reward_mean = (1 - hp.alpha) * running_reward_mean + hp.alpha * reward
 
-        advantage = reward - (running_reward_mean / (epoch + 1))
+        advantage = reward - running_reward_mean
         loss = -log_prob * advantage
 
         loss.backward()
@@ -289,7 +309,7 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         #scheduler.step(valid_loss) 
         current_lr = optimizer.param_groups[0]['lr']
 
-        print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.6f}\n\ttrain_loss : {train_loss:>9.3f} - reward : {reward:>9.6f} - advantage : {advantage:>9.6f}\n")
+        print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.2e}\n\ttrain_loss : {train_loss:.3e} - reward : {reward:>9.6f} - advantage : {advantage:>.3e}\n\tthermal_efficiency : {reward*100:>9.3f}%\n")
 
 def init_train(filename, nb_epoch, verbose=True):
     # Initialize the training process by parsing the input velocity field, setting up the device (GPU or CPU), creating the model, optimizer, criterion, and scheduler, and then calling the train function.
@@ -312,7 +332,7 @@ def init_train(filename, nb_epoch, verbose=True):
     input_time_tensor = time_steps.to(device)
     agent = models.FlowControlCoeffSingleGrid().to(device)
 
-    optimizer = torch.optim.Adam(agent.parameters(), lr=1e-7, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(agent.parameters(), lr=hp.learning_rate, weight_decay=1e-4)
     criterion = criterion_thermal_efficiency_single_grid
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.5,patience=2)
 

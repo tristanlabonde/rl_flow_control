@@ -76,12 +76,15 @@ def draw_coefficients(c):
 
     return W
 
-if len(sys.argv) > 1:
+if sys.argv[1] != "single_grid_input.txt":
     coeffs = [float(arg) for arg in sys.argv[1:]]
     W = draw_coefficients(coeffs)
 else:
     W = W_single_grid_input()
-    
+
+amp_blow = np.abs(W) * 0.8
+E_blow = 0.5 * 0.125 * np.mean(amp_blow**3)
+print("Ejets = ", E_blow)
 fig = plt.figure(figsize=(8, 6))
 ax = fig.add_subplot(111, projection='3d')
 
