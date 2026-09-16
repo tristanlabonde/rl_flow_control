@@ -301,10 +301,14 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         advantage = reward - running_reward_mean
         loss = -log_prob * advantage
 
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=1.0)
-        optimizer.step()
-        train_loss = loss.item()
+        if advantage > 0:
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=1.0)
+            optimizer.step()
+            train_loss = loss.item()
+        else:
+            optimizer.zero_grad()
+            train_loss = 0.0
 
         #scheduler.step(valid_loss) 
         current_lr = optimizer.param_groups[0]['lr']
