@@ -101,9 +101,8 @@ def compute_exergy_nusselt(z, action_np, gamma=hp.gamma, nb_files=4, verbose=Tru
     
     return reward
 
-def compute_thermic_capacity(nb_files, verbose=True):
+def compute_thermic_capacity(verbose=True):
 
-    log_visu_3d = np.loadtxt("data/log_visu_3d.out", dtype=str)
     geometry = np.loadtxt("data/geometry.out")
 
     Lx = geometry[1, 0]
@@ -111,8 +110,6 @@ def compute_thermic_capacity(nb_files, verbose=True):
     Lz = geometry[1, 2]
     Lx_region = ((hp.ng[0] - (hp.starting_x+hp.control_width*hp.cutting_rate+1))/hp.ng[0]) * Lx
     S = Lx_region * Ly
-    nb_parameters = 9 # Number of parameters in the simulation (u, v, w, T, p, etc.)
-    delta_t = float(log_visu_3d[-nb_parameters, -2]) - float(log_visu_3d[-nb_files*nb_parameters, -2])
 
     with open("input.nml", 'r', encoding='utf-8') as f:
         content = f.read()
@@ -120,6 +117,7 @@ def compute_thermic_capacity(nb_files, verbose=True):
     k = 1.0/float((re.search(alphai_pattern, content)).group(1))
 
     delta_T = 1.0
+    delta_t = hp.delta_t
 
     return ((k*delta_T)/Lz)*S*delta_t
 
@@ -130,7 +128,7 @@ def compute_thermal_efficiency(z, action_np, nb_files=4, verbose=True):
     if verbose:
         print(f"\tNusselt mean: {Nu_mean}")
 
-    Cth = compute_thermic_capacity(nb_files, verbose)
+    Cth = compute_thermic_capacity(verbose)
     if verbose:
         print(f"\tThermic capacity: {Cth}")
 
@@ -262,7 +260,6 @@ def criterion_nusselt_single_grid(train_foldername, train_preds, verbose=True):
 
 def criterion_thermal_efficiency_single_grid(train_foldername, train_preds, verbose=True):
     # Create the input file for the simulation using the single grid predicted by the rl agent, launch the simulation, parse the results, and compute thermal efficiency.
-    train_preds = train_preds * hp.max_blow
     create_single_grid_input(train_foldername, train_preds, verbose)
     jobid = launch_simulation(verbose)
     variances = parse_results(jobid, verbose)
@@ -288,7 +285,7 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         log_prob = distribution.log_prob(coeffs_sample).sum()
         w_tensor = agent.generate_grid(coeffs_sample[0])
         action_np = w_tensor.detach().cpu().numpy()
-        action_np = np.clip(action_np, -1.0, 1.0)
+        action_np = np.clip(action_np, -hp.max_blow, hp.max_blow)
         train_foldername = f"training_inputs/training_input_epoch{epoch + 1}"
         reward = criterion(train_foldername, action_np, verbose)
 

@@ -12,6 +12,7 @@ starting_coeff = 2
 nb_coeffs = 4
 tke_ref = 0
 gamma = 0.3
+delta_t = 275.0
 nb_epoch = 50
 starting_blow = 0.4
 max_blow = 0.8
