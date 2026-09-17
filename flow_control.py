@@ -64,23 +64,23 @@ def compute_nusselt(file_temp, z0, z1, verbose=True):
 
     for file in file_temp:
         try:
-            t_data = np.fromfile(file, dtype=np.float64)
-            t = np.reshape(t_data, (hp.ng[0], hp.ng[1], hp.ng[2]), order='F')
+            T_data = np.fromfile(file, dtype=np.float64)
+            T = np.reshape(T_data, (hp.ng[0], hp.ng[1], hp.ng[2]), order='F')
         except FileNotFoundError:
             if verbose:
                 print(f"\033[31mFile {file} not found. Skipping this file.\033[0m")
             continue
 
-        t = t[hp.starting_x+hp.control_width*hp.cutting_rate+1:, :, 0:2] # Extract the temperature data for the specified x-range and first two z-planes
+        T = T[hp.starting_x+hp.control_width*hp.cutting_rate+1:, :, 0:2] # Extract the temperature data for the specified x-range and first two z-planes
         # with open('./saved_std/temperature_z1.txt', 'a', encoding='utf-8') as f:
             # f.write("Values of temperature on z1 plane for file " + file + ": \n\n")
-            # f.write(str(t[1]))
+            # f.write(str(T[1]))
 
-        t_mean_z = np.mean(t, axis=(0,1))
-        nu_wall = (t_mean_z[1] - t_mean_z[0]) / (z1 - z0)
+        T_mean_z = np.mean(T, axis=(0,1))
+        nu_wall = (T_mean_z[1] - T_mean_z[0]) / (z1 - z0)
 
             # f.write("\n\nMean z1, z0: ")
-            # f.write(str(t_mean_z[1]) + " " + str(t_mean_z[0]))
+            # f.write(str(T_mean_z[1]) + " " + str(T_mean_z[0]))
             # f.write("\n\n")
         
         if nu_wall is not np.isnan(nu_wall):
@@ -117,9 +117,8 @@ def compute_thermic_capacity(verbose=True):
     k = 1.0/float((re.search(alphai_pattern, content)).group(1))
 
     delta_T = 1.0
-    delta_t = hp.delta_t
 
-    return ((k*delta_T)/Lz)*S*delta_t
+    return ((k*delta_T)/Lz)*S # * hp.t_eval but simplify when computing thermal efficiency
 
 def compute_thermal_efficiency(z, action_np, nb_files=4, verbose=True):
     file_temp = sorted(glob.glob("data/sca_001_fld_*.bin"))[-nb_files:]
@@ -132,23 +131,22 @@ def compute_thermal_efficiency(z, action_np, nb_files=4, verbose=True):
     if verbose:
         print(f"\tThermic capacity: {Cth}")
 
-    E_out = Cth * Nu_mean
+    P_out = Cth * Nu_mean
     if verbose:
-        print(f"\tE_out: {E_out}")
+        print(f"\tP_out: {P_out}")
 
-    E_out_absolute = Cth * (Nu_mean - hp.Nu_baseline)
-    E_base_pump = 10.0 # Base pumping energy
+    P_out_absolute = Cth * (Nu_mean - hp.Nu_baseline)
 
     amp_blow = np.abs(action_np)
-    E_blow = 0.5 * hp.blow_area_rate * np.mean(amp_blow**3)
+    P_blow = 0.5 * hp.blow_area_rate * np.mean(amp_blow**3)
     if verbose:
-        print(f"\tE_blow: {E_blow}")
+        print(f"\tP_blow: {P_blow}")
         
-    E_in = E_base_pump + E_blow
+    P_in = hp.P_base_pump + P_blow # * hp.t_eval to have E_in but simplify when computing thermal efficiency
     if verbose:
-        print(f"\tE_in: {E_in}")
+        print(f"\tP_in: {P_in}")
 
-    return (E_out / E_in)
+    return (P_out / P_in)
 
 def parse_input(filename, verbose=True):
     if verbose:
