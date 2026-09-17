@@ -272,7 +272,6 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
     for epoch in range(nb_epoch):
         if verbose:
             print(f"Epoch {epoch + 1}/{nb_epoch}")
-        #valid_loss = 0.0
 
         agent.train()
         optimizer.zero_grad()
@@ -295,16 +294,16 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         advantage = reward - running_reward_mean
         loss = -log_prob * advantage
 
-        if advantage > 0:
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=1.0)
-            optimizer.step()
-            train_loss = loss.item()
-        else:
-            optimizer.zero_grad()
-            train_loss = 0.0
+        # if advantage > 0:
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=1.0)
+        optimizer.step()
+        train_loss = loss.item()
+        # else:
+        #    optimizer.zero_grad()
+        #    train_loss = 0.0
 
-        #scheduler.step(valid_loss) 
+        scheduler.step(running_reward_mean)
         current_lr = optimizer.param_groups[0]['lr']
 
         print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.2e}\n\ttrain_loss : {train_loss:.3e} - reward : {reward:>9.6f} - advantage : {advantage:>.3e}\n\tthermal_efficiency : {reward*100:>9.3f}%\n")
@@ -332,7 +331,7 @@ def init_train(filename, nb_epoch, verbose=True):
 
     optimizer = torch.optim.Adam(agent.parameters(), lr=hp.learning_rate, weight_decay=1e-4)
     criterion = criterion_thermal_efficiency_single_grid
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min',factor=0.5,patience=2)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.5,patience=2)
 
     start = time.time()
     train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler)
