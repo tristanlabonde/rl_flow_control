@@ -331,7 +331,7 @@ def init_train(filename, nb_epoch, verbose=True):
 
     optimizer = torch.optim.Adam(agent.parameters(), lr=hp.learning_rate, weight_decay=1e-4)
     criterion = criterion_thermal_efficiency_single_grid
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.5,patience=2)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max',factor=0.5,patience=3)
 
     start = time.time()
     train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, criterion, scheduler)
