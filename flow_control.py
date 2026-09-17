@@ -137,8 +137,7 @@ def compute_thermal_efficiency(z, action_np, nb_files=4, verbose=True):
         print(f"\tE_out: {E_out}")
 
     E_out_absolute = Cth * (Nu_mean - hp.Nu_baseline)
-
-    E_base_pump = 10.0    # Base pumping energy of the channel over delta_t = 75
+    E_base_pump = 10.0 # Base pumping energy
 
     amp_blow = np.abs(action_np)
     E_blow = 0.5 * hp.blow_area_rate * np.mean(amp_blow**3)
