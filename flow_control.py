@@ -127,15 +127,15 @@ def compute_thermal_efficiency(z, action_np, nb_files=4, verbose=True):
     if verbose:
         print(f"\tNusselt mean: {Nu_mean}")
 
-    Cth = compute_thermic_capacity(verbose)
+    Cth_P = compute_thermic_capacity(verbose)
     if verbose:
-        print(f"\tThermic capacity: {Cth}")
+        print(f"\tThermic capacity power: {Cth_P}")
 
-    P_out = Cth * Nu_mean
+    P_out = Cth_P * Nu_mean
     if verbose:
         print(f"\tP_out: {P_out}")
 
-    P_out_absolute = Cth * (Nu_mean - hp.Nu_baseline)
+    P_out_absolute = Cth_P * (Nu_mean - hp.Nu_baseline)
 
     amp_blow = np.abs(action_np)
     P_blow = 0.5 * hp.blow_area_rate * np.mean(amp_blow**3)
