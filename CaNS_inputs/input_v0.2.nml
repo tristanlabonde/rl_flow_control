@@ -1,0 +1,57 @@
+&dns
+! Il faut conserver le ratio ng(1)/l(1)
+ng(1:3) = 128, 128, 256
+l(1:3) = 64.0, 64.0, 85.0
+gtype = 2, gr = 2.0
+
+! 10000 steps, dt fixe à 0.01
+cfl = 0.95, dtmax = 1.e5, dt_f = 0.01
+nstep = 10000, time_max = 100.0, tw_max = 2.0
+stop_type(1:3) = T, F, F
+restart = F, is_overwrite_save = T, nsaves_max = 0
+
+visci = 2000.               ! Reynolds number
+inivel = 'hcp'              ! 'hcp' (Half Channel Poiseuille)
+is_wallturb = F             ! Génère des perturbations pour déclencher la turbulence
+
+! Fréquence d'écriture du dataset
+icheck = 10, iout0d = 10, iout1d = 100, iout2d = 200, iout3d = 1000, isave = 2000
+
+! Conditions aux limites (Z0 = Paroi du bas, Z1 = Sommet de la couche limite)
+! u, v, w périodiques en X et Y.
+! En Z0 (bas) : Adhérence (Dirichlet 0). En Z1 (haut) : Symétrie/Glissement (Neumann pour U et V, Dirichlet 0 pour W)
+cbcvel(0:1,1:3,1) = 'P','P',  'P','P',  'D','N'
+cbcvel(0:1,1:3,2) = 'P','P',  'P','P',  'D','N'
+cbcvel(0:1,1:3,3) = 'P','P',  'P','P',  'D','D'
+cbcpre(0:1,1:3)   = 'P','P',  'P','P',  'N','N'
+
+bcvel(0:1,1:3,1) =  0.,0.,   0.,0.,   0.,0.
+bcvel(0:1,1:3,2) =  0.,0.,   0.,0.,   0.,0.
+bcvel(0:1,1:3,3) =  0.,0.,   0.,0.,   0.,0.
+bcpre(0:1,1:3  ) =  0.,0.,   0.,0.,   0.,0.
+
+! Forçage du fluide
+bforce(1:3) = 0., 0., 0.
+is_forced(1:3) = T, F, F
+velf(1:3) = 1.0, 0., 0.
+
+dims(1:2) = 0, 0, ipencil_axis = 1
+/
+
+&cudecomp
+cudecomp_t_comm_backend = 3
+cudecomp_h_comm_backend = 1
+/
+
+&numerics
+is_impdiff = T, is_impdiff_1d = T
+is_poisson_pcr_tdma = T
+/
+
+&other_options
+is_debug = F, is_timing = T
+/
+
+&io
+io_backend = 'mpiio'
+/

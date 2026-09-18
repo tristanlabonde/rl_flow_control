@@ -3,8 +3,8 @@
 #SBATCH -n 1
 #SBATCH -N 1
 #SBATCH -J flow_control
-#SBATCH -o saved_std/stdout_control.%J
-#SBATCH -e saved_std/stderr_control.%J
+#SBATCH -o jobs_control/stdout_control.%J
+#SBATCH -e jobs_control/stderr_control.%J
 #SBATCH --gres=gpu:1
 export OMP_NUM_THREADS=1
 
