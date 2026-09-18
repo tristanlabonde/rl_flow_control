@@ -20,4 +20,4 @@ alpha = 0.15
 Nu_baseline = 2.962 # calculated and rounded from 2.9619621858466085 obtained from the baseline simulation with no control
 P_base_pump = 0.061 # calculated and rounded from 0.060989 obtained from the calculus operated in the tmp.py file in the "P_base_pump computation" section
 blow_area_rate = nb_width_points / ng[0]
-learning_rate = 1e-5
+learning_rate = 1e-6
