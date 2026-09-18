@@ -1,3 +1,6 @@
+! Flow control file used as control.f90 in the CaNS code.
+! Reads data files containing blowing scheme - w velocities (z axis) - to apply as flow control in CaNS simulation.
+! This code needs one file per step of the simulation. It applies a control depending on space and time
 module mod_blowing
 contains
 subroutine apply_wall_blowing(istep, time, w)
@@ -8,14 +11,17 @@ subroutine apply_wall_blowing(istep, time, w)
   real(rp), intent(in) :: time
   real(rp), intent(inout) :: w(0:,0:,0:)
 
-  real(rp), parameter :: max_blow = 0.1_rp ! Maximum blowing force
+  real(rp), parameter :: max_blow = 0.8_rp ! Maximum blowing force
 
   integer :: file_unit, io_status, read_status, f_x, f_y, gx, gy
   real(rp) :: f_amp
 
+  character(len=10) :: step_str
+
+  write(step_str, '(I0)') (istep - 1)
   f_amp = 0.0_rp
   file_unit = 99
-  open(unit=file_unit, file="wall_blowing_input/single_grid_input.txt", status="old", action="read", iostat=io_status)
+  open(unit=file_unit, file="wall_blowing_input/grids_input"//trim(adjustl(step_str))//".txt", status="old", action="read", iostat=io_status)
   if (io_status /= 0) then
     print *, "ERROR: Unable to open file"
     return
@@ -34,11 +40,10 @@ subroutine apply_wall_blowing(istep, time, w)
     gy = f_y + 1 ! Indice y global
     w(gx, gy, 0) = max_blow * f_amp
   end do
-
-  close(file_unit)
   
   !$acc update device(w(:,:,0))
-  !$acc wait
   
+  close(file_unit)
+
 end subroutine apply_wall_blowing
 end module mod_blowing

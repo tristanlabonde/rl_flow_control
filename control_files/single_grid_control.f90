@@ -1,3 +1,6 @@
+! Flow control file used as control.f90 in the CaNS code.
+! Reads data file containing blowing scheme - w velocities (z axis) - to apply as flow control in CaNS simulation.
+! This code needs one file for all the simulation. It applies a control depending on space only. The blowing scheme is applied at each steps and is read in the same file during all the simulation.
 module mod_blowing
   use mod_param, only: rp
   implicit none
@@ -21,7 +24,6 @@ subroutine apply_wall_blowing(istep, time, w)
   nx_max = ubound(w, 1)
   ny_max = ubound(w, 2)
 
-  ! 1. Initialisation unique sur l'hôte (CPU)
   if (.not. is_initialized) then
 
     allocate(blow_profile(0:nx_max, 0:ny_max))
@@ -43,12 +45,10 @@ subroutine apply_wall_blowing(istep, time, w)
       close(file_unit)
     end if
 
-    ! Copie initiale du profil vers la mémoire GPU
     !$acc enter data copyin(blow_profile)
     is_initialized = .true.
   end if
 
-  ! 2. Application directement DANS LE GPU (évite les transferts PCIe à chaque itération)
   !$acc kernels present(w, blow_profile)
   do j = 0, ny_max
     do i = 0, nx_max

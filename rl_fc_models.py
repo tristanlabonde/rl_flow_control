@@ -1,10 +1,11 @@
+# In this file are defined differents AI models
 import torch.nn as nn
 import torch
 import hyperparameters as hp
 
 nb_channels = hp.nb_components # channels : velocity u, velocity v, velocity w
 
-class FlowControlGrids(nn.Module): # Predict 1 per time step
+class FlowControlGrids(nn.Module): # Predict 1 grid per time step
     def __init__(self):
         super().__init__()
         self.conv = nn.Sequential(

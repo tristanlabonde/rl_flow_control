@@ -1,3 +1,5 @@
+# This file is used to compute hyperparameters based on the results of a not controled CaNS simulation
+# It's a testing file, not used in the training code
 import numpy as np
 
 ng = [512, 128, 160]

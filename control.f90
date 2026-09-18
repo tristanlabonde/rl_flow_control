@@ -1,3 +1,6 @@
+! Flow control file used as control.f90 in the CaNS code.
+! Reads data file containing blowing scheme - w velocities (z axis) - to apply as flow control in CaNS simulation.
+! This code needs one file for all the simulation. It applies a control depending on space only. The blowing scheme is applied at each steps and is read in the same file during all the simulation.
 module mod_blowing
   use mod_param, only: rp
   implicit none
@@ -14,18 +17,13 @@ subroutine apply_wall_blowing(istep, time, w)
   real(rp), intent(in) :: time
   real(rp), intent(inout) :: w(0:,0:,0:)
 
-  real(rp), parameter :: max_blow = 0.1_rp
-
   integer :: file_unit, io_status, read_status, f_x, f_y, gx, gy
   real(rp) :: f_amp
-  integer :: nx_max, ny_max
+  integer :: nx_max, ny_max, i, j
 
   nx_max = ubound(w, 1)
   ny_max = ubound(w, 2)
 
-  ! -------------------------------------------------------------
-  ! 1. LECTURE DU FICHIER UNE SEULE FOIS AU DÉMARRAGE
-  ! -------------------------------------------------------------
   if (.not. is_initialized) then
 
     allocate(blow_profile(0:nx_max, 0:ny_max))
@@ -41,25 +39,23 @@ subroutine apply_wall_blowing(istep, time, w)
         gx = f_x + 1
         gy = f_y + 1
         if (gx <= nx_max .and. gy <= ny_max) then
-          blow_profile(gx, gy) = max_blow * f_amp
+          blow_profile(gx, gy) = f_amp
         end if
       end do
       close(file_unit)
     end if
 
+    !$acc enter data copyin(blow_profile)
     is_initialized = .true.
   end if
 
-  ! -------------------------------------------------------------
-  ! 2. APPLICATION PROPRE DU PROFIL À CHAQUE PAS
-  ! -------------------------------------------------------------
-  w(0:nx_max, 0:ny_max, 0) = blow_profile(0:nx_max, 0:ny_max)
-
-  ! -------------------------------------------------------------
-  ! 3. SYNCHRONISATION GPU SÉCURISÉE
-  ! -------------------------------------------------------------
-  !$acc update device(w(0:nx_max, 0:ny_max, 0))
-  !$acc wait
+  !$acc kernels present(w, blow_profile)
+  do j = 0, ny_max
+    do i = 0, nx_max
+      w(i, j, 0) = blow_profile(i, j)
+    end do
+  end do
+  !$acc end kernels
 
 end subroutine apply_wall_blowing
 end module mod_blowing

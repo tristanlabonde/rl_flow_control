@@ -1,3 +1,6 @@
+! Flow control file used as control.f90 in the CaNS code.
+! Reads data file containing blowing scheme - w velocities (z axis) - to apply as flow control in CaNS simulation.
+! This code applies a blowing scheme based on the computation of the sinus fonction multiplicated by max_blow.
 module mod_blowing
 contains
 subroutine apply_wall_blowing(istep, time, w)

@@ -1,3 +1,5 @@
+! Flow control file used as control.f90 in the CaNS code.
+! This code applies a continuous control with blowing at max_blow velocity on each point of the control area
 module mod_blowing
 contains
 subroutine apply_wall_blowing(istep, time, w)
@@ -8,20 +10,15 @@ subroutine apply_wall_blowing(istep, time, w)
   real(rp), intent(in) :: time
   real(rp), intent(inout) :: w(0:,0:,0:)
 
-  real(rp), parameter :: max_blow = 0.9_rp ! Maximum blowing force
-  integer :: freq = 1
+  real(rp), parameter :: max_blow = 0.8_rp ! Maximum blowing force
 
   integer :: x, y
 
   do y = 1, 128
     do x = 101, 164
-        w(x, y, 0) = max_blow - (istep/freq)*0.1
+        w(x, y, 0) = max_blow
     end do
   end do
-
-  ! if (mod(istep, 1000) == 0) then
-  !   print *, "istep", istep, "w", max_blow - (istep/1000)*0.1
-  ! endif
 
   !$acc update device(w(:,:,0))
 

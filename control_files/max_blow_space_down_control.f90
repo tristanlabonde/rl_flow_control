@@ -1,3 +1,7 @@
+! Flow control file used as control.f90 in the CaNS code.
+! This code applies a sinusoidal-stairs-like control in space (x axis)
+! e.g. blowing for the 4 first x coordinates at max_blow then, for the next 4 x coordinate, blow at max_blow - 0.1*rate, etc.
+! Blow stays between max_blow and - maxblow.
 module mod_blowing
 contains
 subroutine apply_wall_blowing(istep, time, w)
