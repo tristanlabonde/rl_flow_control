@@ -39,16 +39,16 @@ def train(agent, input_velocity_tensor, input_time_tensor, nb_epoch, optimizer, 
         advantage = reward - running_reward_mean
         loss = -log_prob * advantage
 
-        # if advantage > 0:
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=1.0)
-        optimizer.step()
-        train_loss = loss.item()
-        # else:
-        #    optimizer.zero_grad()
-        #    train_loss = 0.0
+        if advantage > 0:
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(agent.parameters(), max_norm=1.0)
+            optimizer.step()
+            train_loss = loss.item()
+        else:
+           optimizer.zero_grad()
+           train_loss = 0.0
 
-        scheduler.step(running_reward_mean)
+        # scheduler.step(running_reward_mean)
         current_lr = optimizer.param_groups[0]['lr']
 
         print(f"Epoch {epoch+1:>4}/{nb_epoch} - LR actuel : {current_lr:.2e}\n\ttrain_loss : {train_loss:.3e} - reward : {reward:>9.6f} - advantage : {advantage:>.3e}\n\tthermal_efficiency : {reward*100:>9.3f}%\n")

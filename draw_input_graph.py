@@ -16,6 +16,8 @@ control_width = 64//cutting_rate
 control_length = ng[1]//cutting_rate
 nb_actions = control_width * control_length
 
+max_blow = 0.8
+
 x = np.arange(starting_x, starting_x + control_width, 1)
 y = np.arange(0, control_length, 1)
 X, Y = np.meshgrid(x, y)
@@ -47,6 +49,7 @@ def draw_coefficients(c):
     for i in range(nb_coeffs):
         W += c[i] * sin_x[i][:, np.newaxis] * sin_y[i][np.newaxis, :]
 
+    W = np.clip(W, -max_blow, max_blow)
     return W
 
 if sys.argv[1][-4:] != ".txt":
@@ -55,9 +58,6 @@ if sys.argv[1][-4:] != ".txt":
 else:
     W = W_single_grid_input()
 
-amp_blow = np.abs(W) * 0.8
-E_blow = 0.5 * 0.125 * np.mean(amp_blow**3)
-print("Ejets = ", E_blow)
 fig = plt.figure(figsize=(8, 6))
 ax = fig.add_subplot(111, projection='3d')
 

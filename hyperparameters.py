@@ -30,5 +30,5 @@ learning_rate = 1e-6
 # for hyperparameters exploration
 starting_coeff = 2
 coeff_step = 1
-starting_blow = 0.4
-blowstep = 0.1
+starting_blow = 0.8
+blow_step = 0.1
